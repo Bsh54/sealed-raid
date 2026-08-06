@@ -41,6 +41,7 @@ contract SealedRaid {
     mapping(uint256 => Match) private matches;
     mapping(uint256 => mapping(uint8 => elist)) private boards;
     mapping(uint256 => mapping(uint8 => mapping(uint256 => bool))) public raided;
+    mapping(uint256 => mapping(uint8 => mapping(uint256 => uint8))) public revealedContent;
     mapping(uint256 => bytes32) public pendingHandle;
     mapping(uint256 => uint256) public pendingPos;
 
@@ -140,6 +141,7 @@ contract SealedRaid {
         uint256 content = uint256(attestation.value);
 
         raided[id][opp][pos] = true;
+        revealedContent[id][opp][pos] = uint8(content);
         pendingHandle[id] = bytes32(0);
 
         if (content == SHARD) {
@@ -209,5 +211,12 @@ contract SealedRaid {
 
     function placementFee() external view returns (uint256) {
         return inco.getFee() * GRID;
+    }
+
+    function getRevealedBoard(uint256 id, uint8 seat) external view returns (uint8[] memory out) {
+        out = new uint8[](GRID);
+        for (uint256 i = 0; i < GRID; i++) {
+            out[i] = raided[id][seat][i] ? revealedContent[id][seat][i] + 1 : 0;
+        }
     }
 }

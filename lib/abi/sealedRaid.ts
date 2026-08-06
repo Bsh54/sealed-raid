@@ -368,6 +368,30 @@ export const sealedRaidAbi = [
       },
       {
         "internalType": "uint8",
+        "name": "seat",
+        "type": "uint8"
+      }
+    ],
+    "name": "getRevealedBoard",
+    "outputs": [
+      {
+        "internalType": "uint8[]",
+        "name": "out",
+        "type": "uint8[]"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "id",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
         "name": "player",
         "type": "uint8"
       },
@@ -507,6 +531,35 @@ export const sealedRaidAbi = [
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "revealedContent",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
       }
     ],
     "stateMutability": "view",
