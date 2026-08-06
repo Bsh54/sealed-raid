@@ -81,7 +81,7 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
 
 export default function DashboardPage() {
   return (
-    <main className="flex-1">
+    <main className="flex flex-1 flex-col">
       <header className="border-b border-line px-4 py-4 sm:px-6 lg:px-8">
         <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
           <Logo />
@@ -89,7 +89,7 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[1440px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-3 lg:px-8 lg:py-8">
+      <div className="mx-auto grid w-full max-w-[1440px] flex-1 content-start gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8 lg:py-10">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <JackpotBanner />
           <div>
@@ -111,6 +111,26 @@ export default function DashboardPage() {
           <NewMatch />
         </div>
       </div>
+
+      <StatusBar />
     </main>
+  );
+}
+
+function StatusBar() {
+  return (
+    <footer className="border-t border-line px-4 py-3 sm:px-6 lg:px-8">
+      <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
+        <span className="label-caps flex items-center gap-2 text-fg-dim">
+          <span className="h-1.5 w-1.5 bg-shard" />
+          L1 // Encrypted Session
+        </span>
+        <div className="label-caps flex items-center gap-6 text-fg-dim">
+          <span className="hover:text-fg">Docs</span>
+          <span className="hover:text-fg">Security</span>
+          <span className="text-shard">Status</span>
+        </div>
+      </div>
+    </footer>
   );
 }
