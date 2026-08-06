@@ -11,7 +11,6 @@ import {
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { Lightning } from "@inco/lightning-js/lite";
-import { handleTypes } from "@inco/lightning-js";
 import { sealedRaidAbi } from "./abi.mjs";
 
 const RPC = process.env.RPC_URL || "https://sepolia.base.org";
@@ -25,10 +24,8 @@ if (!CONTRACT || !KEY) {
 }
 
 const GRID = 36;
-const SHARDS = 5;
-const TRAPS = 6;
 const BOT_SEAT = 1;
-const OPP_SEAT = 0;
+const ZERO_HANDLE = "0x" + "0".repeat(64);
 
 const account = privateKeyToAccount(KEY.startsWith("0x") ? KEY : `0x${KEY}`, { nonceManager });
 const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
@@ -36,6 +33,7 @@ const walletClient = createWalletClient({ account, chain: baseSepolia, transport
 const contract = { address: CONTRACT, abi: sealedRaidAbi };
 
 const active = new Set();
+const firstSeen = new Map();
 let zap = null;
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -49,35 +47,10 @@ async function read(fn, args = []) {
   return publicClient.readContract({ ...contract, functionName: fn, args });
 }
 
-let writeLock = Promise.resolve();
-
-function serialize(task) {
-  const run = writeLock.then(task, task);
-  writeLock = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
 async function write(fn, args, value) {
-  return serialize(async () => {
-    const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
-    await publicClient.waitForTransactionReceipt({ hash });
-    return hash;
-  });
-}
-
-function randomBoard() {
-  const idx = [...Array(GRID).keys()];
-  for (let i = idx.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [idx[i], idx[j]] = [idx[j], idx[i]];
-  }
-  const content = Array(GRID).fill(0);
-  idx.slice(0, SHARDS).forEach((k) => (content[k] = 1));
-  idx.slice(SHARDS, SHARDS + TRAPS).forEach((k) => (content[k] = 2));
-  return content;
+  const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
+  await publicClient.waitForTransactionReceipt({ hash });
+  return hash;
 }
 
 async function reveal(handle) {
@@ -106,43 +79,21 @@ async function reveal(handle) {
 async function pickCell(id) {
   const free = [];
   for (let pos = 0; pos < GRID; pos++) {
-    const raided = await read("isRaided", [BigInt(id), OPP_SEAT, BigInt(pos)]);
-    if (!raided) free.push(pos);
+    if (!(await read("isRaided", [BigInt(id), BigInt(pos)]))) free.push(pos);
   }
-  if (free.length === 0) return null;
-  return free[Math.floor(Math.random() * free.length)];
-}
-
-async function commitPlacement(id) {
-  const board = randomBoard();
-  const z = await getZap();
-  const cells = await Promise.all(
-    board.map((c) =>
-      z.encrypt(BigInt(c), {
-        accountAddress: account.address,
-        dappAddress: CONTRACT,
-        handleType: handleTypes.euint256,
-      }),
-    ),
-  );
-  const fee = await read("placementFee");
-  const pre = await read("getMatch", [BigInt(id)]);
-  console.log(`[${id}] pre-commit phase=${pre[3]} host=${pre[0].slice(0, 8)} guest=${pre[1].slice(0, 8)}`);
-  await write("commitPlacement", [BigInt(id), cells], fee);
-  console.log(`[${id}] bot committed placement`);
+  return free.length ? free[Math.floor(Math.random() * free.length)] : null;
 }
 
 async function playMatch(id) {
-  await commitPlacement(id);
   while (true) {
     const m = await read("getMatch", [BigInt(id)]);
     const phase = m[3];
     const turn = m[4];
-    if (phase === 3) {
+    if (phase === 2) {
       console.log(`[${id}] match ended`);
       break;
     }
-    if (phase === 2 && turn === BOT_SEAT) {
+    if (phase === 1 && turn === BOT_SEAT) {
       const pos = await pickCell(id);
       if (pos === null) {
         await sleep(2000);
@@ -151,6 +102,10 @@ async function playMatch(id) {
       try {
         await write("raid", [BigInt(id), BigInt(pos)]);
         const handle = await read("pendingHandle", [BigInt(id)]);
+        if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
+          await sleep(2000);
+          continue;
+        }
         const { attestation, signatures } = await reveal(handle);
         await write("settleRaid", [BigInt(id), attestation, signatures]);
         console.log(`[${id}] bot raided cell ${pos}`);
@@ -177,8 +132,9 @@ async function maybeJoin(id) {
       active.delete(id);
       return;
     }
+    const fee = await read("joinFee");
     console.log(`[${id}] bot joining (stake ${stake})`);
-    await write("joinMatch", [BigInt(id)], stake);
+    await write("joinMatch", [BigInt(id)], stake + fee);
     await playMatch(id);
   } catch (e) {
     console.warn(`[${id}] join/play error:`, e.shortMessage || e.message);
@@ -186,8 +142,6 @@ async function maybeJoin(id) {
     active.delete(id);
   }
 }
-
-const firstSeen = new Map();
 
 async function scan() {
   const nextId = await read("nextMatchId");
