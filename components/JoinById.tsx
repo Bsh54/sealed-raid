@@ -24,15 +24,21 @@ export function JoinById() {
     chainId: baseSepolia.id,
     query: { enabled: id !== null },
   });
+  const { data: fee } = useReadContract({
+    ...sealedRaidContract,
+    functionName: "joinFee",
+    chainId: baseSepolia.id,
+  });
 
   async function join() {
     if (id === null || !match || !burner.ready) return;
     const stake = (match as readonly unknown[])[2] as bigint;
+    const joinFee = (fee as bigint) ?? parseEther("0.001");
     setBusy(true);
     try {
-      await burner.ensureFunded(stake + GAS_BUFFER);
-      await burner.writeGame("joinMatch", [id], stake);
-      router.push(`/placement?id=${id.toString()}`);
+      await burner.ensureFunded(stake + joinFee + GAS_BUFFER);
+      await burner.writeGame("joinMatch", [id], stake + joinFee);
+      router.push(`/raid?id=${id.toString()}`);
     } catch {
       setBusy(false);
     }

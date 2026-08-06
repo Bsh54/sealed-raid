@@ -4,7 +4,7 @@ import { Lightning } from "@inco/lightning-js/lite";
 import { sealedRaidAbi } from "./abi.mjs";
 
 const RPC = "https://sepolia.base.org";
-const C = "0x3ecbf922e6315b8b5b1bb7af9123a8b771b57432";
+const C = "0x6ee87da5b690fb7ab56c7c7ad39be054c24c97ea";
 
 async function main() {
   const pc = createPublicClient({ chain: baseSepolia, transport: http(RPC) });

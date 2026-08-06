@@ -11,8 +11,7 @@ import { revealHandle } from "@/lib/inco-attestation";
 
 const GRID = 36;
 const ZERO_HANDLE = "0x" + "0".repeat(64);
-
-type Content = 0 | 1 | 2;
+const ZERO_ADDR = "0x0000000000000000000000000000000000000000";
 
 function ShardIcon() {
   return (
@@ -20,14 +19,6 @@ function ShardIcon() {
       <path d="M6 3h12l4 6-10 13L2 9Z" />
       <path d="M11 3 8 9l4 13 4-13-3-6" />
       <path d="M2 9h20" />
-    </svg>
-  );
-}
-
-function IceIcon() {
-  return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round">
-      <path d="M12 2v20M4 5l16 14M20 5 4 19M2 12h20" />
     </svg>
   );
 }
@@ -48,8 +39,7 @@ function Raid() {
   const [turn, setTurn] = useState(0);
   const [hostScore, setHostScore] = useState(0);
   const [guestScore, setGuestScore] = useState(0);
-  const [winner, setWinner] = useState<string | null>(null);
-  const [opened, setOpened] = useState<Record<number, Content>>({});
+  const [opened, setOpened] = useState<Record<number, number>>({});
   const [pending, setPending] = useState<Record<number, boolean>>({});
   const [step, setStep] = useState<"idle" | "raiding" | "revealing" | "settling">("idle");
   const [error, setError] = useState<string | null>(null);
@@ -62,8 +52,7 @@ function Raid() {
         ? 1
         : -1
     : -1;
-  const oppSeat = mySeat === 0 ? 1 : 0;
-  const isMyTurn = phase === 2 && turn === mySeat && step === "idle";
+  const isMyTurn = phase === 1 && turn === mySeat && step === "idle";
 
   const refresh = useCallback(async () => {
     if (!client || matchId === null) return;
@@ -78,20 +67,18 @@ function Raid() {
     setTurn(m[4]);
     setHostScore(m[5]);
     setGuestScore(m[6]);
-    setWinner(m[7] === "0x0000000000000000000000000000000000000000" ? null : m[7]);
 
-    const seat = m[0].toLowerCase() === (me ?? "").toLowerCase() ? 1 : 0;
     const cells = (await client.readContract({
       ...sealedRaidContract,
       functionName: "getRevealedBoard",
-      args: [matchId, seat],
+      args: [matchId],
     })) as readonly number[];
-    const map: Record<number, Content> = {};
+    const map: Record<number, number> = {};
     cells.forEach((v, i) => {
-      if (v > 0) map[i] = (v - 1) as Content;
+      if (v > 0) map[i] = v;
     });
     setOpened(map);
-  }, [client, matchId, me]);
+  }, [client, matchId]);
 
   useEffect(() => {
     refresh();
@@ -100,9 +87,7 @@ function Raid() {
   }, [refresh]);
 
   useEffect(() => {
-    if (phase === 3 && matchId !== null) {
-      router.push(`/victory?id=${matchId.toString()}`);
-    }
+    if (phase === 2 && matchId !== null) router.push(`/victory?id=${matchId.toString()}`);
   }, [phase, matchId, router]);
 
   async function raidCell(pos: number) {
@@ -127,7 +112,6 @@ function Raid() {
 
       setStep("settling");
       await burner.writeGame("settleRaid", [matchId, attestation, signatures]);
-
       await refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message.split("\n")[0] : "Raid failed");
@@ -143,19 +127,19 @@ function Raid() {
 
   const myScore = mySeat === 0 ? hostScore : guestScore;
   const oppScore = mySeat === 0 ? guestScore : hostScore;
+  const waiting = phase === 0;
 
-  const statusLabel =
-    phase < 2
-      ? "Waiting for both placements..."
-      : step === "raiding"
-        ? "Raiding cell..."
-        : step === "revealing"
-          ? "Decrypting via Inco (~1-2 min)..."
-          : step === "settling"
-            ? "Settling on-chain..."
-            : isMyTurn
-              ? "Your turn // select a cell"
-              : "Opponent's turn...";
+  const statusLabel = waiting
+    ? "Waiting for opponent..."
+    : step === "raiding"
+      ? "Raiding cell..."
+      : step === "revealing"
+        ? "Decrypting via Inco (~1-2 min)..."
+        : step === "settling"
+          ? "Settling on-chain..."
+          : isMyTurn
+            ? "Your turn // raid a cell"
+            : "Opponent's turn...";
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
@@ -170,71 +154,89 @@ function Raid() {
         </div>
       </header>
 
-      <div className="mb-6 flex gap-3">
-        <div className={`panel flex-1 p-4 ${isMyTurn ? "border-shard/40" : ""}`}>
-          <div className="label-caps text-fg-dim">You</div>
-          <div className="data mt-2 text-3xl font-bold text-shard">{myScore}</div>
+      {waiting ? (
+        <div className="panel p-10 text-center">
+          <div className="mx-auto mb-5 h-8 w-8 animate-spin border-2 border-shard border-t-transparent" />
+          <div className="label-caps text-shard">Waiting for opponent to join</div>
+          <div className="mt-5">
+            <div className="label-caps text-fg-dim">Share this match id</div>
+            <div className="data mt-1 text-3xl text-fg">#{matchId?.toString() ?? "-"}</div>
+          </div>
+          {guest && guest !== ZERO_ADDR && (
+            <div className="label-caps mt-4 text-fg-dim">Generating encrypted vault...</div>
+          )}
         </div>
-        <div className="panel flex-1 p-4">
-          <div className="label-caps text-fg-dim">Opponent</div>
-          <div className="data mt-2 text-3xl font-bold text-ice">{oppScore}</div>
-        </div>
-      </div>
+      ) : (
+        <>
+          <div className="mb-6 flex gap-3">
+            <div className={`panel flex-1 p-4 ${isMyTurn ? "border-shard/40" : ""}`}>
+              <div className="label-caps text-fg-dim">You</div>
+              <div className="data mt-2 text-3xl font-bold text-shard">{myScore}</div>
+            </div>
+            <div className="panel flex-1 p-4">
+              <div className="label-caps text-fg-dim">Opponent</div>
+              <div className="data mt-2 text-3xl font-bold text-ice">{oppScore}</div>
+            </div>
+          </div>
 
-      <div className="panel p-4 sm:p-6">
-        <div className="mb-4 flex items-center justify-between">
-          <span className="font-semibold">Enemy Vault</span>
-          <span className="label-caps flex items-center gap-2 text-shard">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="11" width="18" height="11" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            </svg>
-            Encrypted Onchain
-          </span>
-        </div>
+          <div className="panel p-4 sm:p-6">
+            <div className="mb-4 flex items-center justify-between">
+              <span className="font-semibold">Encrypted Vault</span>
+              <span className="label-caps flex items-center gap-2 text-shard">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="11" width="18" height="11" />
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                </svg>
+                {SHARDS_LEFT(myScore, oppScore)} shards left
+              </span>
+            </div>
 
-        <div className="grid grid-cols-6 gap-2">
-          {Array.from({ length: GRID }).map((_, i) => {
-            const isOpen = i in opened;
-            const content = opened[i];
-            const isPending = pending[i];
-            return (
-              <button
-                key={i}
-                onClick={() => raidCell(i)}
-                disabled={!isMyTurn || isOpen}
-                className={`flex aspect-square items-center justify-center border transition-all ${
-                  isPending
-                    ? "animate-pulse border-shard text-shard"
-                    : isOpen
-                      ? content === 1
-                        ? "border-shard bg-shard/10 text-shard glow-shard"
-                        : content === 2
-                          ? "border-ice bg-ice/10 text-ice glow-ice"
-                          : "border-line bg-void text-muted"
-                      : isMyTurn
-                        ? "border-line bg-surface-2/40 text-muted hover:border-shard/60 hover:text-shard"
-                        : "border-line bg-surface-2/40 text-muted"
-                }`}
-              >
-                {!isOpen && (
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="11" width="18" height="11" />
-                    <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-                  </svg>
-                )}
-                {isOpen && content === 1 && <ShardIcon />}
-                {isOpen && content === 2 && <IceIcon />}
-                {isOpen && content === 0 && <span className="data text-fg-dim">·</span>}
-              </button>
-            );
-          })}
-        </div>
-      </div>
+            <div className="grid grid-cols-6 gap-2">
+              {Array.from({ length: GRID }).map((_, i) => {
+                const val = opened[i];
+                const isOpen = val !== undefined;
+                const isPending = pending[i];
+                return (
+                  <button
+                    key={i}
+                    onClick={() => raidCell(i)}
+                    disabled={!isMyTurn || isOpen}
+                    className={`flex aspect-square items-center justify-center border transition-all ${
+                      isPending
+                        ? "animate-pulse border-shard text-shard"
+                        : isOpen
+                          ? val === 2
+                            ? "border-shard bg-shard/10 text-shard glow-shard"
+                            : "border-line bg-void text-muted"
+                          : isMyTurn
+                            ? "border-line bg-surface-2/40 text-muted hover:border-shard/60 hover:text-shard"
+                            : "border-line bg-surface-2/40 text-muted"
+                    }`}
+                  >
+                    {!isOpen && (
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <rect x="3" y="11" width="18" height="11" />
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4" />
+                      </svg>
+                    )}
+                    {isOpen && val === 2 && <ShardIcon />}
+                    {isOpen && val === 1 && <span className="data text-fg-dim">·</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
-      {error && <p className="label-caps mt-4 break-words text-center text-ice">{error}</p>}
+          {error && <p className="label-caps mt-4 break-words text-center text-ice">{error}</p>}
+        </>
+      )}
     </div>
   );
+}
+
+function SHARDS_LEFT(a: number, b: number) {
+  const left = 5 - a - b;
+  return left < 0 ? 0 : left;
 }
 
 export default function RaidPage() {

@@ -1,23 +1,19 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import {euint256, e, inco, elist, ETypes} from "@inco/lightning/src/Lib.sol";
+import {ebool, e, inco, elist, ETypes} from "@inco/lightning/src/Lib.sol";
 import {DecryptionAttestation} from "@inco/lightning/src/lightning-parts/DecryptionAttester.types.sol";
+import {asBool} from "@inco/lightning/src/shared/TypeUtils.sol";
 
 contract SealedRaid {
     using e for *;
 
     uint256 public constant GRID = 36;
     uint256 public constant SHARDS = 5;
-    uint256 public constant TRAPS = 6;
-
-    uint256 public constant VOID = 0;
-    uint256 public constant SHARD = 1;
-    uint256 public constant ICE = 2;
+    uint256 public constant WIN_TARGET = 3;
 
     enum Phase {
         Open,
-        Placement,
         Raiding,
         Ended
     }
@@ -28,29 +24,26 @@ contract SealedRaid {
         uint256 stake;
         Phase phase;
         uint8 turn;
-        uint8 committedCount;
-        uint16 foundShards;
         uint8 hostScore;
         uint8 guestScore;
+        uint16 foundShards;
         address winner;
         bool isPrivate;
-        bool[2] committed;
     }
 
     uint256 public nextMatchId = 1;
     mapping(uint256 => Match) private matches;
-    mapping(uint256 => mapping(uint8 => elist)) private boards;
-    mapping(uint256 => mapping(uint8 => mapping(uint256 => bool))) public raided;
-    mapping(uint256 => mapping(uint8 => mapping(uint256 => uint8))) public revealedContent;
+    mapping(uint256 => elist) private boards;
+    mapping(uint256 => mapping(uint256 => bool)) public raided;
+    mapping(uint256 => mapping(uint256 => uint8)) public revealedContent;
     mapping(uint256 => bytes32) public pendingHandle;
     mapping(uint256 => uint256) public pendingPos;
 
     event MatchCreated(uint256 indexed id, address indexed host, uint256 stake, bool isPrivate);
     event MatchJoined(uint256 indexed id, address indexed guest);
-    event PlacementCommitted(uint256 indexed id, address indexed player, uint8 index);
     event PhaseChanged(uint256 indexed id, Phase phase);
     event CellRaided(uint256 indexed id, uint8 indexed byPlayer, uint256 pos, bytes32 handle);
-    event CellRevealed(uint256 indexed id, uint8 indexed byPlayer, uint256 pos, uint256 content);
+    event CellRevealed(uint256 indexed id, uint8 indexed byPlayer, uint256 pos, bool shard);
     event MatchEnded(uint256 indexed id, address indexed winner, uint256 pot);
 
     function createMatch(bool isPrivate) external payable returns (uint256 id) {
@@ -64,44 +57,34 @@ contract SealedRaid {
         emit MatchCreated(id, msg.sender, msg.value, isPrivate);
     }
 
+    function joinFee() external view returns (uint256) {
+        return inco.getEListFee(uint16(GRID), ETypes.Bool);
+    }
+
     function joinMatch(uint256 id) external payable {
         Match storage m = matches[id];
         require(m.phase == Phase.Open, "not open");
         require(m.host != address(0), "no match");
         require(msg.sender != m.host, "self");
-        require(msg.value == m.stake, "wrong stake");
+        uint256 fee = inco.getEListFee(uint16(GRID), ETypes.Bool);
+        require(msg.value >= m.stake + fee, "value");
+
         m.guest = msg.sender;
-        m.phase = Phase.Placement;
-        emit MatchJoined(id, msg.sender);
-        emit PhaseChanged(id, Phase.Placement);
-    }
 
-    function commitPlacement(uint256 id, bytes[] calldata cells) external payable {
-        Match storage m = matches[id];
-        require(m.phase == Phase.Placement, "phase");
-        uint8 idx = _seat(m, msg.sender);
-        require(!m.committed[idx], "committed");
-        require(cells.length == GRID, "len");
-        require(msg.value >= inco.getFee() * GRID, "fee");
-
+        bytes32 trueHandle = ebool.unwrap(e.asEbool(true));
+        bytes32 falseHandle = ebool.unwrap(e.asEbool(false));
         bytes32[] memory handles = new bytes32[](GRID);
         for (uint256 i = 0; i < GRID; i++) {
-            euint256 cell = cells[i].newEuint256(msg.sender);
-            e.allow(cell, address(this));
-            handles[i] = euint256.unwrap(cell);
+            handles[i] = i < SHARDS ? trueHandle : falseHandle;
         }
-        elist board = e.newEList(handles, ETypes.Uint256);
+        elist board = e.newEList(handles, ETypes.Bool);
+        board = e.shuffle(board);
         inco.allow(elist.unwrap(board), address(this));
-        boards[id][idx] = board;
+        boards[id] = board;
 
-        m.committed[idx] = true;
-        m.committedCount += 1;
-        emit PlacementCommitted(id, msg.sender, idx);
-
-        if (m.committedCount == 2) {
-            m.phase = Phase.Raiding;
-            emit PhaseChanged(id, Phase.Raiding);
-        }
+        m.phase = Phase.Raiding;
+        emit MatchJoined(id, msg.sender);
+        emit PhaseChanged(id, Phase.Raiding);
     }
 
     function raid(uint256 id, uint256 pos) external {
@@ -111,12 +94,11 @@ contract SealedRaid {
         uint8 idx = _seat(m, msg.sender);
         require(m.turn == idx, "turn");
         require(pos < GRID, "oob");
-        uint8 opp = 1 - idx;
-        require(!raided[id][opp][pos], "raided");
+        require(!raided[id][pos], "raided");
 
-        euint256 cell = e.getEuint256(boards[id][opp], uint16(pos));
+        ebool cell = e.getEbool(boards[id], uint16(pos));
         e.reveal(cell);
-        bytes32 handle = euint256.unwrap(cell);
+        bytes32 handle = ebool.unwrap(cell);
         pendingHandle[id] = handle;
         pendingPos[id] = pos;
         emit CellRaided(id, idx, pos, handle);
@@ -136,25 +118,25 @@ contract SealedRaid {
         );
 
         uint8 idx = m.turn;
-        uint8 opp = 1 - idx;
         uint256 pos = pendingPos[id];
-        uint256 content = uint256(attestation.value);
+        bool shard = asBool(attestation.value);
 
-        raided[id][opp][pos] = true;
-        revealedContent[id][opp][pos] = uint8(content);
+        raided[id][pos] = true;
+        revealedContent[id][pos] = shard ? 1 : 0;
         pendingHandle[id] = bytes32(0);
 
-        if (content == SHARD) {
+        if (shard) {
             if (idx == 0) m.hostScore += 1;
             else m.guestScore += 1;
             m.foundShards += 1;
         }
-        emit CellRevealed(id, idx, pos, content);
+        emit CellRevealed(id, idx, pos, shard);
 
-        if (m.foundShards >= SHARDS * 2) {
+        uint8 sc = idx == 0 ? m.hostScore : m.guestScore;
+        if (sc >= WIN_TARGET || m.foundShards >= SHARDS) {
             _finish(id);
-        } else if (content != SHARD) {
-            m.turn = opp;
+        } else if (!shard) {
+            m.turn = 1 - idx;
         }
     }
 
@@ -205,18 +187,14 @@ contract SealedRaid {
         );
     }
 
-    function isRaided(uint256 id, uint8 player, uint256 pos) external view returns (bool) {
-        return raided[id][player][pos];
-    }
-
-    function placementFee() external view returns (uint256) {
-        return inco.getFee() * GRID;
-    }
-
-    function getRevealedBoard(uint256 id, uint8 seat) external view returns (uint8[] memory out) {
+    function getRevealedBoard(uint256 id) external view returns (uint8[] memory out) {
         out = new uint8[](GRID);
         for (uint256 i = 0; i < GRID; i++) {
-            out[i] = raided[id][seat][i] ? revealedContent[id][seat][i] + 1 : 0;
+            out[i] = raided[id][i] ? revealedContent[id][i] + 1 : 0;
         }
+    }
+
+    function isRaided(uint256 id, uint256 pos) external view returns (bool) {
+        return raided[id][pos];
     }
 }

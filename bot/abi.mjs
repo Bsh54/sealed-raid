@@ -1,10 +1,5 @@
 export const sealedRaidAbi = [
   {
-    "inputs": [],
-    "name": "CallFailedAfterFeeRefresh",
-    "type": "error"
-  },
-  {
     "anonymous": false,
     "inputs": [
       {
@@ -58,9 +53,9 @@ export const sealedRaidAbi = [
       },
       {
         "indexed": false,
-        "internalType": "uint256",
-        "name": "content",
-        "type": "uint256"
+        "internalType": "bool",
+        "name": "shard",
+        "type": "bool"
       }
     ],
     "name": "CellRevealed",
@@ -161,59 +156,8 @@ export const sealedRaidAbi = [
     "type": "event"
   },
   {
-    "anonymous": false,
-    "inputs": [
-      {
-        "indexed": true,
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "indexed": true,
-        "internalType": "address",
-        "name": "player",
-        "type": "address"
-      },
-      {
-        "indexed": false,
-        "internalType": "uint8",
-        "name": "index",
-        "type": "uint8"
-      }
-    ],
-    "name": "PlacementCommitted",
-    "type": "event"
-  },
-  {
     "inputs": [],
     "name": "GRID",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "ICE",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "SHARD",
     "outputs": [
       {
         "internalType": "uint256",
@@ -239,7 +183,7 @@ export const sealedRaidAbi = [
   },
   {
     "inputs": [],
-    "name": "TRAPS",
+    "name": "WIN_TARGET",
     "outputs": [
       {
         "internalType": "uint256",
@@ -248,37 +192,6 @@ export const sealedRaidAbi = [
       }
     ],
     "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
-    "name": "VOID",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [
-      {
-        "internalType": "uint256",
-        "name": "id",
-        "type": "uint256"
-      },
-      {
-        "internalType": "bytes[]",
-        "name": "cells",
-        "type": "bytes[]"
-      }
-    ],
-    "name": "commitPlacement",
-    "outputs": [],
-    "stateMutability": "payable",
     "type": "function"
   },
   {
@@ -365,11 +278,6 @@ export const sealedRaidAbi = [
         "internalType": "uint256",
         "name": "id",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint8",
-        "name": "seat",
-        "type": "uint8"
       }
     ],
     "name": "getRevealedBoard",
@@ -391,11 +299,6 @@ export const sealedRaidAbi = [
         "type": "uint256"
       },
       {
-        "internalType": "uint8",
-        "name": "player",
-        "type": "uint8"
-      },
-      {
         "internalType": "uint256",
         "name": "pos",
         "type": "uint256"
@@ -407,6 +310,19 @@ export const sealedRaidAbi = [
         "internalType": "bool",
         "name": "",
         "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "joinFee",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
       }
     ],
     "stateMutability": "view",
@@ -477,19 +393,6 @@ export const sealedRaidAbi = [
     "type": "function"
   },
   {
-    "inputs": [],
-    "name": "placementFee",
-    "outputs": [
-      {
-        "internalType": "uint256",
-        "name": "",
-        "type": "uint256"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -515,11 +418,6 @@ export const sealedRaidAbi = [
         "type": "uint256"
       },
       {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      },
-      {
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
@@ -542,11 +440,6 @@ export const sealedRaidAbi = [
         "internalType": "uint256",
         "name": "",
         "type": "uint256"
-      },
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
       },
       {
         "internalType": "uint256",
