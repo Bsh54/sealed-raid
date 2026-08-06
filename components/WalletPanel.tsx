@@ -37,11 +37,6 @@ export function WalletPanel() {
         </span>
       </div>
 
-      <div className="mt-2 flex items-center justify-between">
-        <span className="label-caps text-fg-dim">Record</span>
-        <span className="data text-sm text-fg">3W · 1L</span>
-      </div>
-
       <div className="mt-4 border-t border-line pt-3">
         {wrongNetwork ? (
           <button

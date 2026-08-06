@@ -1,13 +1,7 @@
 import { ConnectWallet } from "@/components/ConnectWallet";
-import { NewMatch } from "@/components/NewMatch";
+import { FindMatch } from "@/components/FindMatch";
 import { WalletPanel } from "@/components/WalletPanel";
 import { JoinById } from "@/components/JoinById";
-
-const openMatches = [
-  { host: "Nyx", stake: 5, id: "0x7C...1A" },
-  { host: "Echo", stake: 1, id: "0x2D...8B" },
-  { host: "Raven", stake: 10, id: "0x9F...4E" },
-];
 
 function Logo() {
   return (
@@ -26,99 +20,6 @@ function Logo() {
   );
 }
 
-function JackpotBanner() {
-  return (
-    <div className="panel relative overflow-hidden p-6">
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <div className="label-caps text-fg-dim">Total Megapot Jackpot</div>
-          <div className="data mt-2 text-4xl font-bold text-shard">$25,430.12</div>
-        </div>
-        <div className="text-right">
-          <div className="label-caps text-fg-dim">Next Draw</div>
-          <div className="data mt-2 text-lg text-fg">14h 22m</div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SectionHeader({ title, note }: { title: string; note: string }) {
-  return (
-    <div className="mb-3 flex items-center justify-between">
-      <h2 className="text-lg font-semibold">{title}</h2>
-      <span className="label-caps text-fg-dim">{note}</span>
-    </div>
-  );
-}
-
-function EmptyState({ label }: { label: string }) {
-  return (
-    <div className="panel p-6 text-center">
-      <span className="label-caps text-fg-dim">{label}</span>
-    </div>
-  );
-}
-
-function OpenMatchRow({ match }: { match: (typeof openMatches)[number] }) {
-  return (
-    <div className="panel flex items-center justify-between p-4">
-      <div className="flex items-center gap-4">
-        <div className="h-10 w-10 border border-line bg-surface-2" />
-        <div>
-          <div className="font-semibold">{match.host}</div>
-          <div className="label-caps mt-1 text-fg-dim">Open Challenge</div>
-        </div>
-      </div>
-      <div className="flex items-center gap-6">
-        <div className="hidden text-right sm:block">
-          <div className="data text-sm text-fg">{match.stake} USDC</div>
-          <div className="data mt-1 text-xs text-fg-dim">{match.id}</div>
-        </div>
-        <button className="term-btn">Join</button>
-      </div>
-    </div>
-  );
-}
-
-export default function DashboardPage() {
-  return (
-    <main className="flex flex-1 flex-col">
-      <header className="border-b border-line px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
-          <Logo />
-          <ConnectWallet />
-        </div>
-      </header>
-
-      <div className="mx-auto grid w-full max-w-[1440px] flex-1 content-start gap-6 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8 lg:py-10">
-        <div className="flex flex-col gap-8 lg:col-span-2">
-          <JackpotBanner />
-
-          <section>
-            <SectionHeader title="Open Matches" note={`${openMatches.length} Awaiting`} />
-            <div className="flex flex-col gap-3">
-              <JoinById />
-              {openMatches.length === 0 ? (
-                <EmptyState label="No open challenges — create one" />
-              ) : (
-                openMatches.map((m) => <OpenMatchRow key={m.id} match={m} />)
-              )}
-            </div>
-          </section>
-        </div>
-
-        <div className="flex flex-col gap-6">
-          <WalletPanel />
-          <NewMatch />
-        </div>
-      </div>
-
-      <StatusBar />
-    </main>
-  );
-}
-
 function StatusBar() {
   return (
     <footer className="border-t border-line px-4 py-3 sm:px-6 lg:px-8">
@@ -134,5 +35,41 @@ function StatusBar() {
         </div>
       </div>
     </footer>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <main className="flex flex-1 flex-col">
+      <header className="border-b border-line px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
+          <Logo />
+          <ConnectWallet />
+        </div>
+      </header>
+
+      <div className="mx-auto grid w-full max-w-[1440px] flex-1 items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8">
+        <div className="lg:col-span-2">
+          <div className="mx-auto max-w-md">
+            <div className="mb-6 text-center">
+              <h1 className="text-3xl font-extrabold tracking-tight text-shard">
+                ENTER THE ARENA
+              </h1>
+              <p className="label-caps mt-3 text-fg-dim">
+                Hide your vault. Raid theirs. Winner takes the pot.
+              </p>
+            </div>
+            <FindMatch />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-6">
+          <WalletPanel />
+          <JoinById />
+        </div>
+      </div>
+
+      <StatusBar />
+    </main>
   );
 }
