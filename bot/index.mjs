@@ -188,6 +188,8 @@ async function main() {
   publicClient.watchContractEvent({
     ...contract,
     eventName: "MatchCreated",
+    poll: true,
+    pollingInterval: 4000,
     onLogs: (logs) => {
       for (const log of logs) {
         const { id, isPrivate } = log.args;
