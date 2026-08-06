@@ -82,12 +82,14 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
 export default function DashboardPage() {
   return (
     <main className="flex-1">
-      <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
-        <Logo />
-        <ConnectWallet />
+      <header className="border-b border-line px-4 py-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
+          <Logo />
+          <ConnectWallet />
+        </div>
       </header>
 
-      <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
+      <div className="mx-auto grid w-full max-w-[1440px] gap-6 px-4 py-6 sm:px-6 lg:grid-cols-3 lg:px-8 lg:py-8">
         <div className="flex flex-col gap-6 lg:col-span-2">
           <JackpotBanner />
           <div>
