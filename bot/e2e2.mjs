@@ -91,17 +91,20 @@ async function main() {
       break;
     }
     if (phase === 1 && turn === HOST_SEAT) {
-      const pos = await pickCell(id);
-      if (pos === null) { await sleep(2000); continue; }
       try {
         const t0 = Date.now();
-        await send("raid", [id, BigInt(pos)]);
-        const handle = await read("pendingHandle", [id]);
+        let handle = await read("pendingHandle", [id]);
+        if (!handle || handle.toLowerCase() === ZERO) {
+          const pos = await pickCell(id);
+          if (pos === null) { await sleep(2000); continue; }
+          await send("raid", [id, BigInt(pos)]);
+          handle = await read("pendingHandle", [id]);
+        }
         if (!handle || handle.toLowerCase() === ZERO) { await sleep(2000); continue; }
         const { attestation, signatures } = await reveal(handle);
         await send("settleRaid", [id, attestation, signatures]);
         const mm = await read("getMatch", [id]);
-        console.log(`raided ${pos} in ${((Date.now() - t0) / 1000).toFixed(0)}s | scores ${mm[5]}-${mm[6]}`);
+        console.log(`raid settled in ${((Date.now() - t0) / 1000).toFixed(0)}s | scores ${mm[5]}-${mm[6]}`);
       } catch (e) {
         console.warn("raid err:", e.shortMessage || e.message);
         await sleep(2000);

@@ -95,14 +95,21 @@ function Raid() {
     setError(null);
     setPending((p) => ({ ...p, [pos]: true }));
     try {
-      setStep("raiding");
-      await burner.writeGame("raid", [matchId, BigInt(pos)]);
-
-      const handle = (await client.readContract({
+      let handle = (await client.readContract({
         ...sealedRaidContract,
         functionName: "pendingHandle",
         args: [matchId],
       })) as HexString;
+
+      if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
+        setStep("raiding");
+        await burner.writeGame("raid", [matchId, BigInt(pos)]);
+        handle = (await client.readContract({
+          ...sealedRaidContract,
+          functionName: "pendingHandle",
+          args: [matchId],
+        })) as HexString;
+      }
       if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
         throw new Error("No pending handle after raid");
       }

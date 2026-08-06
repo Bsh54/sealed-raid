@@ -95,21 +95,26 @@ async function playMatch(id) {
       break;
     }
     if (phase === 1 && turn === BOT_SEAT) {
-      const pos = await pickCell(id);
-      if (pos === null) {
-        await sleep(2000);
-        continue;
-      }
       try {
-        await write("raid", [BigInt(id), BigInt(pos)]);
-        const handle = await read("pendingHandle", [BigInt(id)]);
+        let handle = await read("pendingHandle", [BigInt(id)]);
+        if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
+          const pos = await pickCell(id);
+          if (pos === null) {
+            await sleep(2000);
+            continue;
+          }
+          await write("raid", [BigInt(id), BigInt(pos)]);
+          handle = await read("pendingHandle", [BigInt(id)]);
+          console.log(`[${id}] bot raided cell ${pos}`);
+        } else {
+          console.log(`[${id}] resuming pending reveal`);
+        }
         if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
           await sleep(2000);
           continue;
         }
         const { attestation, signatures } = await reveal(handle);
         await write("settleRaid", [BigInt(id), attestation, signatures]);
-        console.log(`[${id}] bot raided cell ${pos}`);
       } catch (e) {
         console.warn(`[${id}] raid error:`, e.shortMessage || e.message);
         await sleep(2000);
