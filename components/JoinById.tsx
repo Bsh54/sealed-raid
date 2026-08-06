@@ -9,7 +9,7 @@ import { sealedRaidContract } from "@/lib/contract";
 import { useBurner } from "@/lib/burner";
 
 const GAS_BUFFER = parseEther("0.02");
-const JOIN_BUFFER = parseEther("0.0005");
+const JOIN_BUFFER = parseEther("0.003");
 
 export function JoinById() {
   const router = useRouter();

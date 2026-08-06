@@ -85,6 +85,12 @@ contract SealedRaid {
         m.phase = Phase.Raiding;
         emit MatchJoined(id, msg.sender);
         emit PhaseChanged(id, Phase.Raiding);
+
+        uint256 excess = msg.value - m.stake - fee;
+        if (excess > 0) {
+            (bool ok, ) = msg.sender.call{value: excess}("");
+            require(ok, "refund");
+        }
     }
 
     function raid(uint256 id, uint256 pos) external {

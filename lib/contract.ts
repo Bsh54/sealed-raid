@@ -1,7 +1,7 @@
 import { sealedRaidAbi } from "@/lib/abi/sealedRaid";
 
 export const SEALED_RAID_ADDRESS = (process.env.NEXT_PUBLIC_SEALED_RAID_ADDRESS ??
-  "0x6ee87da5b690fb7ab56c7c7ad39be054c24c97ea") as `0x${string}`;
+  "0x852a9463b4074157f80a8100b715bda8a056071b") as `0x${string}`;
 
 export const sealedRaidContract = {
   address: SEALED_RAID_ADDRESS,
