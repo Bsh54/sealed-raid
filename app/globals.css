@@ -1,26 +1,85 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --void: #0a0c10;
+  --surface: #14181e;
+  --surface-2: #1a1f27;
+  --shard: #00f0ff;
+  --ice: #ff9d00;
+  --muted: #4a5568;
+  --line: rgba(255, 255, 255, 0.07);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --fg: #e2e2e8;
+  --fg-dim: #849495;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+  --color-void: var(--void);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-shard: var(--shard);
+  --color-ice: var(--ice);
+  --color-muted: var(--muted);
+  --color-line: var(--line);
+  --color-fg: var(--fg);
+  --color-fg-dim: var(--fg-dim);
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--void);
+  color: var(--fg);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@layer components {
+  .panel {
+    background-color: color-mix(in srgb, var(--surface) 82%, transparent);
+    border: 1px solid var(--line);
+    backdrop-filter: blur(12px);
+  }
+
+  .label-caps {
+    font-family: var(--font-mono), monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+    font-size: 12px;
+    line-height: 1;
+  }
+
+  .data {
+    font-family: var(--font-mono), monospace;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .glow-shard {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.3);
+  }
+
+  .glow-ice {
+    box-shadow: 0 0 15px rgba(255, 157, 0, 0.3);
+  }
+
+  .term-btn {
+    font-family: var(--font-mono), monospace;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 700;
+    font-size: 13px;
+    border: 1px solid var(--shard);
+    color: var(--shard);
+    background: transparent;
+    padding: 12px 20px;
+    cursor: pointer;
+    transition: background-color 0.15s, color 0.15s;
+  }
+
+  .term-btn:hover {
+    background-color: var(--shard);
+    color: var(--void);
+  }
 }
