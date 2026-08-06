@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, Suspense, useState } from "react";
+import { Fragment, Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { baseSepolia } from "wagmi/chains";
 import {
@@ -48,6 +48,7 @@ function Placement() {
   const [board, setBoard] = useState<Cell[]>(Array(GRID).fill(null));
   const [tool, setTool] = useState<Kind>("shard");
   const [status, setStatus] = useState<"idle" | "encrypting" | "committing">("idle");
+  const [error, setError] = useState<string | null>(null);
 
   const { data: fee } = useReadContract({
     ...sealedRaidContract,
@@ -55,12 +56,25 @@ function Placement() {
     chainId: baseSepolia.id,
   });
 
-  const { writeContract, data: hash } = useWriteContract();
-  const { isSuccess } = useWaitForTransactionReceipt({ hash });
+  const { writeContract, data: hash, error: writeError } = useWriteContract();
+  const { data: receipt } = useWaitForTransactionReceipt({ hash });
 
-  if (isSuccess && matchId) {
-    router.push(`/raid?id=${matchId}`);
-  }
+  useEffect(() => {
+    if (writeError) {
+      setStatus("idle");
+      setError(writeError.message.split("\n")[0]);
+    }
+  }, [writeError]);
+
+  useEffect(() => {
+    if (!receipt) return;
+    if (receipt.status === "success" && matchId) {
+      router.push(`/raid?id=${matchId}`);
+    } else if (receipt.status === "reverted") {
+      setStatus("idle");
+      setError("Commit transaction reverted");
+    }
+  }, [receipt, matchId, router]);
 
   const placedShards = board.filter((c) => c === "shard").length;
   const placedTraps = board.filter((c) => c === "ice").length;
@@ -85,6 +99,7 @@ function Placement() {
 
   async function commit() {
     if (!address || !matchId || fee === undefined) return;
+    setError(null);
     setStatus("encrypting");
     try {
       const cells: `0x${string}`[] = [];
@@ -100,8 +115,9 @@ function Placement() {
         value: fee,
         chainId: baseSepolia.id,
       });
-    } catch {
+    } catch (e) {
       setStatus("idle");
+      setError(e instanceof Error ? e.message.split("\n")[0] : "Encryption failed");
     }
   }
 
@@ -110,27 +126,17 @@ function Placement() {
     : status === "encrypting"
       ? "Encrypting placement..."
       : status === "committing"
-        ? "Confirm in wallet..."
+        ? hash
+          ? "Committing on-chain..."
+          : "Confirm in wallet..."
         : "Encrypt & Commit";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-8 lg:px-8">
-      <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-extrabold tracking-tight text-shard">
-            PHASE 1 // DEPLOYMENT
-          </h1>
-          <p className="mt-3 max-w-md text-sm text-fg-dim panel p-3">
-            Deploy {TOTAL_SHARDS} Shards and {TOTAL_TRAPS} ICE Traps. Your placement is
-            encrypted client-side using Inco FHE before it ever leaves your browser.
-          </p>
-        </div>
-        <div className="label-caps flex items-center gap-2 border border-shard/40 px-3 py-2 text-shard">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z" />
-          </svg>
-          Client Encryption: Active
-        </div>
+    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8">
+      <header className="mb-6">
+        <h1 className="text-3xl font-extrabold tracking-tight text-shard">
+          PHASE 1 // DEPLOYMENT
+        </h1>
       </header>
 
       <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
@@ -168,9 +174,8 @@ function Placement() {
           >
             {label}
           </button>
-          {!matchId && (
-            <p className="label-caps text-xs text-ice">No match id in URL</p>
-          )}
+          {error && <p className="label-caps text-xs break-words text-ice">{error}</p>}
+          {!matchId && <p className="label-caps text-xs text-ice">No match id in URL</p>}
         </div>
 
         <div className="panel p-4 sm:p-6">
