@@ -3,11 +3,6 @@ import { NewMatch } from "@/components/NewMatch";
 import { WalletPanel } from "@/components/WalletPanel";
 import { JoinById } from "@/components/JoinById";
 
-const activeMatches = [
-  { opponent: "Vyper", stake: 10, id: "0xA9...2F", status: "YOUR TURN", live: true },
-  { opponent: "Cipher", stake: 5, id: "0x4B...9C", status: "AWAITING OPPONENT", live: false },
-];
-
 const openMatches = [
   { host: "Nyx", stake: 5, id: "0x7C...1A" },
   { host: "Echo", stake: 1, id: "0x2D...8B" },
@@ -65,33 +60,6 @@ function EmptyState({ label }: { label: string }) {
   );
 }
 
-function ActiveMatchRow({ match }: { match: (typeof activeMatches)[number] }) {
-  return (
-    <div className="panel flex items-center justify-between p-4">
-      <div className="flex items-center gap-4">
-        <div className="h-10 w-10 border border-line bg-surface-2" />
-        <div>
-          <div className="font-semibold">VS. {match.opponent}</div>
-          <div className={`label-caps mt-1 ${match.live ? "text-shard" : "text-fg-dim"}`}>
-            {match.status}
-          </div>
-        </div>
-      </div>
-      <div className="flex items-center gap-6">
-        <div className="hidden text-right sm:block">
-          <div className="data text-sm text-fg">{match.stake} USDC</div>
-          <div className="data mt-1 text-xs text-fg-dim">{match.id}</div>
-        </div>
-        {match.live ? (
-          <button className="term-btn">Enter</button>
-        ) : (
-          <span className="label-caps text-fg-dim">Waiting</span>
-        )}
-      </div>
-    </div>
-  );
-}
-
 function OpenMatchRow({ match }: { match: (typeof openMatches)[number] }) {
   return (
     <div className="panel flex items-center justify-between p-4">
@@ -135,20 +103,6 @@ export default function DashboardPage() {
                 <EmptyState label="No open challenges — create one" />
               ) : (
                 openMatches.map((m) => <OpenMatchRow key={m.id} match={m} />)
-              )}
-            </div>
-          </section>
-
-          <section>
-            <SectionHeader
-              title="Active Matches"
-              note={`${activeMatches.length} Encrypted Sessions`}
-            />
-            <div className="flex flex-col gap-3">
-              {activeMatches.length === 0 ? (
-                <EmptyState label="No active raids yet" />
-              ) : (
-                activeMatches.map((m) => <ActiveMatchRow key={m.id} match={m} />)
               )}
             </div>
           </section>
