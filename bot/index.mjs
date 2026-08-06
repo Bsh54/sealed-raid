@@ -48,10 +48,23 @@ async function read(fn, args = []) {
   return publicClient.readContract({ ...contract, functionName: fn, args });
 }
 
+let writeLock = Promise.resolve();
+
+function serialize(task) {
+  const run = writeLock.then(task, task);
+  writeLock = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
 async function write(fn, args, value) {
-  const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
-  await publicClient.waitForTransactionReceipt({ hash });
-  return hash;
+  return serialize(async () => {
+    const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
+    await publicClient.waitForTransactionReceipt({ hash });
+    return hash;
+  });
 }
 
 function randomBoard() {
