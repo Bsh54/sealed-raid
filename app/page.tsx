@@ -18,6 +18,8 @@ const activeMatches = [
   },
 ];
 
+const navItems = ["Terminal", "Arena", "Leaderboard", "Vault"];
+
 function Logo() {
   return (
     <div className="flex items-center gap-3">
@@ -35,16 +37,43 @@ function Logo() {
   );
 }
 
-function JackpotRibbon() {
+function Sidebar() {
   return (
-    <div className="panel flex flex-wrap items-center justify-between gap-2 px-5 py-3">
-      <div className="label-caps flex items-center gap-2 text-shard">
-        <span className="h-1.5 w-1.5 bg-shard" />
-        Daily Megapot Jackpot
+    <aside className="hidden w-56 shrink-0 flex-col justify-between border-r border-line p-4 lg:flex">
+      <nav className="flex flex-col gap-1">
+        {navItems.map((item, i) => (
+          <button
+            key={item}
+            className={`label-caps flex items-center gap-3 px-3 py-3 text-left transition-colors ${
+              i === 0
+                ? "border-l-2 border-shard bg-surface text-shard"
+                : "text-fg-dim hover:text-fg"
+            }`}
+          >
+            {item}
+          </button>
+        ))}
+      </nav>
+      <div className="flex flex-col gap-1">
+        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Settings</button>
+        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Support</button>
       </div>
-      <div className="flex items-center gap-6">
-        <span className="data text-lg font-bold text-shard">$25,430.12</span>
-        <span className="data text-xs text-fg-dim">next draw 14h 22m</span>
+    </aside>
+  );
+}
+
+function JackpotBanner() {
+  return (
+    <div className="panel relative overflow-hidden p-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <div className="label-caps text-fg-dim">Total Megapot Jackpot</div>
+          <div className="data mt-2 text-4xl font-bold text-shard">$25,430.12</div>
+        </div>
+        <div className="text-right">
+          <div className="label-caps text-fg-dim">Next Draw</div>
+          <div className="data mt-2 text-lg text-fg">14h 22m</div>
+        </div>
       </div>
     </div>
   );
@@ -63,7 +92,7 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
         </div>
       </div>
       <div className="flex items-center gap-6">
-        <div className="text-right">
+        <div className="hidden text-right sm:block">
           <div className="data text-sm text-fg">{match.stake} USDC</div>
           <div className="data mt-1 text-xs text-fg-dim">{match.id}</div>
         </div>
@@ -79,32 +108,37 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
 
 export default function DashboardPage() {
   return (
-    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
-      <header className="mb-6 flex items-center justify-between">
-        <Logo />
-        <ConnectWallet />
-      </header>
+    <div className="flex min-h-full flex-1">
+      <Sidebar />
+      <main className="flex-1">
+        <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
+          <Logo />
+          <ConnectWallet />
+        </header>
 
-      <JackpotRibbon />
+        <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
+          <div className="flex flex-col gap-6 lg:col-span-2">
+            <JackpotBanner />
+            <div>
+              <div className="mb-3 flex items-center justify-between">
+                <h2 className="text-lg font-semibold">Active Matches</h2>
+                <span className="label-caps text-fg-dim">
+                  {activeMatches.length} Encrypted Sessions
+                </span>
+              </div>
+              <div className="flex flex-col gap-3">
+                {activeMatches.map((m) => (
+                  <MatchRow key={m.id} match={m} />
+                ))}
+              </div>
+            </div>
+          </div>
 
-      <section className="mt-8">
-        <div className="mb-4 flex items-center justify-between gap-4">
-          <h2 className="text-lg font-semibold">
-            Active Matches
-            <span className="label-caps ml-2 text-fg-dim">{activeMatches.length}</span>
-          </h2>
+          <div className="flex flex-col gap-6">
+            <NewMatch />
+          </div>
         </div>
-
-        <div className="mb-4">
-          <NewMatch />
-        </div>
-
-        <div className="flex flex-col gap-3">
-          {activeMatches.map((m) => (
-            <MatchRow key={m.id} match={m} />
-          ))}
-        </div>
-      </section>
-    </main>
+      </main>
+    </div>
   );
 }
