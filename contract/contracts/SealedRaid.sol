@@ -57,7 +57,7 @@ contract SealedRaid {
         emit MatchCreated(id, msg.sender, msg.value, isPrivate);
     }
 
-    uint256 public constant JOIN_BUFFER = 0.008 ether;
+    uint256 public constant JOIN_BUFFER = 0.015 ether;
 
     function joinMatch(uint256 id) external payable {
         Match storage m = matches[id];

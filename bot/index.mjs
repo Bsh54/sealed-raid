@@ -134,7 +134,7 @@ async function maybeJoin(id) {
       return;
     }
     console.log(`[${id}] bot joining (stake ${stake})`);
-    await write("joinMatch", [BigInt(id)], stake + parseEther("0.008"));
+    await write("joinMatch", [BigInt(id)], stake + parseEther("0.02"));
     await playMatch(id);
   } catch (e) {
     console.warn(`[${id}] join/play error:`, e.shortMessage || e.message);

@@ -16,7 +16,7 @@ import { useBurner } from "@/lib/burner";
 
 const STAKES = [0.001, 0.005, 0.01];
 const GAS_BUFFER = parseEther("0.02");
-const JOIN_BUFFER = parseEther("0.008");
+const JOIN_BUFFER = parseEther("0.02");
 
 type M = readonly [
   `0x${string}`,
