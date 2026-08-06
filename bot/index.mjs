@@ -126,6 +126,8 @@ async function commitPlacement(id) {
     ),
   );
   const fee = await read("placementFee");
+  const pre = await read("getMatch", [BigInt(id)]);
+  console.log(`[${id}] pre-commit phase=${pre[3]} host=${pre[0].slice(0, 8)} guest=${pre[1].slice(0, 8)}`);
   await write("commitPlacement", [BigInt(id), cells], fee);
   console.log(`[${id}] bot committed placement`);
 }
@@ -164,17 +166,18 @@ async function playMatch(id) {
 
 async function maybeJoin(id) {
   if (active.has(id)) return;
-  const m = await read("getMatch", [BigInt(id)]);
-  const host = m[0];
-  const stake = m[2];
-  const phase = m[3];
-  const isPrivate = m[8];
-  if (phase !== 0 || isPrivate) return;
-  if (host.toLowerCase() === account.address.toLowerCase()) return;
-
   active.add(id);
-  console.log(`[${id}] bot joining (stake ${stake})`);
   try {
+    const m = await read("getMatch", [BigInt(id)]);
+    const host = m[0];
+    const stake = m[2];
+    const phase = m[3];
+    const isPrivate = m[8];
+    if (phase !== 0 || isPrivate || host.toLowerCase() === account.address.toLowerCase()) {
+      active.delete(id);
+      return;
+    }
+    console.log(`[${id}] bot joining (stake ${stake})`);
     await write("joinMatch", [BigInt(id)], stake);
     await playMatch(id);
   } catch (e) {
