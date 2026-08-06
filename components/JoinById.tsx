@@ -1,14 +1,20 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { parseEther } from "viem";
 import { baseSepolia } from "wagmi/chains";
-import { useReadContract, useWaitForTransactionReceipt, useWriteContract } from "wagmi";
+import { useReadContract } from "wagmi";
 import { sealedRaidContract } from "@/lib/contract";
+import { useBurner } from "@/lib/burner";
+
+const GAS_BUFFER = parseEther("0.02");
 
 export function JoinById() {
   const router = useRouter();
+  const burner = useBurner();
   const [value, setValue] = useState("");
+  const [busy, setBusy] = useState(false);
   const id = /^\d+$/.test(value) ? BigInt(value) : null;
 
   const { data: match } = useReadContract({
@@ -19,25 +25,17 @@ export function JoinById() {
     query: { enabled: id !== null },
   });
 
-  const { writeContract, data: hash, isPending } = useWriteContract();
-  const { data: receipt } = useWaitForTransactionReceipt({ hash });
-
-  useEffect(() => {
-    if (receipt?.status === "success" && id !== null) {
-      router.push(`/placement?id=${id.toString()}`);
-    }
-  }, [receipt, id, router]);
-
-  function join() {
-    if (id === null || !match) return;
+  async function join() {
+    if (id === null || !match || !burner.ready) return;
     const stake = (match as readonly unknown[])[2] as bigint;
-    writeContract({
-      ...sealedRaidContract,
-      functionName: "joinMatch",
-      args: [id],
-      value: stake,
-      chainId: baseSepolia.id,
-    });
+    setBusy(true);
+    try {
+      await burner.ensureFunded(stake + GAS_BUFFER);
+      await burner.writeGame("joinMatch", [id], stake);
+      router.push(`/placement?id=${id.toString()}`);
+    } catch {
+      setBusy(false);
+    }
   }
 
   return (
@@ -49,8 +47,8 @@ export function JoinById() {
         placeholder="e.g. 3"
         className="data flex-1 border border-line bg-void px-3 py-2 text-sm text-fg outline-none placeholder:text-fg-dim focus:border-shard"
       />
-      <button className="term-btn" disabled={id === null || isPending} onClick={join}>
-        {isPending ? "..." : "Join"}
+      <button className="term-btn" disabled={id === null || busy || !burner.ready} onClick={join}>
+        {busy ? "..." : "Join"}
       </button>
     </div>
   );

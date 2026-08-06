@@ -3,6 +3,8 @@ import { FindMatch } from "@/components/FindMatch";
 import { WalletPanel } from "@/components/WalletPanel";
 import { JoinById } from "@/components/JoinById";
 
+const navItems = ["Terminal", "Arena", "Leaderboard", "Vault"];
+
 function Logo() {
   return (
     <div className="flex items-center gap-3">
@@ -20,56 +22,62 @@ function Logo() {
   );
 }
 
-function StatusBar() {
+function Sidebar() {
   return (
-    <footer className="border-t border-line px-4 py-3 sm:px-6 lg:px-8">
-      <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
-        <span className="label-caps flex items-center gap-2 text-fg-dim">
-          <span className="h-1.5 w-1.5 bg-shard" />
-          L1 // Encrypted Session
-        </span>
-        <div className="label-caps flex items-center gap-6 text-fg-dim">
-          <span className="hover:text-fg">Docs</span>
-          <span className="hover:text-fg">Security</span>
-          <span className="text-shard">Status</span>
-        </div>
+    <aside className="hidden w-56 shrink-0 flex-col justify-between border-r border-line p-4 pt-10 lg:flex">
+      <nav className="mt-8 flex flex-col gap-1">
+        {navItems.map((item, i) => (
+          <button
+            key={item}
+            className={`label-caps flex items-center gap-3 px-3 py-3 text-left transition-colors ${
+              i === 0
+                ? "border-l-2 border-shard bg-surface text-shard"
+                : "text-fg-dim hover:text-fg"
+            }`}
+          >
+            {item}
+          </button>
+        ))}
+      </nav>
+      <div className="flex flex-col gap-1">
+        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Settings</button>
+        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Support</button>
       </div>
-    </footer>
+    </aside>
   );
 }
 
 export default function DashboardPage() {
   return (
-    <main className="flex flex-1 flex-col">
-      <header className="border-b border-line px-4 py-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex w-full max-w-[1440px] items-center justify-between">
+    <div className="flex min-h-full flex-1">
+      <Sidebar />
+      <main className="flex flex-1 flex-col">
+        <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
           <Logo />
           <ConnectWallet />
-        </div>
-      </header>
+        </header>
 
-      <div className="mx-auto grid w-full max-w-[1440px] flex-1 items-center gap-8 px-4 py-8 sm:px-6 lg:grid-cols-3 lg:px-8">
-        <div className="lg:col-span-2">
-          <div className="mx-auto max-w-md">
-            <div className="mb-6 text-center">
-              <h1 className="text-3xl font-extrabold tracking-tight text-shard">
-                ENTER THE ARENA
-              </h1>
-              <p className="label-caps mt-3 text-fg-dim">
-                Hide your vault. Raid theirs. Winner takes the pot.
-              </p>
+        <div className="grid flex-1 items-center gap-8 p-4 lg:grid-cols-3 lg:p-8">
+          <div className="lg:col-span-2">
+            <div className="mx-auto max-w-md">
+              <div className="mb-6 text-center">
+                <h1 className="text-3xl font-extrabold tracking-tight text-shard">
+                  ENTER THE ARENA
+                </h1>
+                <p className="label-caps mt-3 text-fg-dim">
+                  Hide your vault. Raid theirs. Winner takes the pot.
+                </p>
+              </div>
+              <FindMatch />
             </div>
-            <FindMatch />
+          </div>
+
+          <div className="flex flex-col gap-6">
+            <WalletPanel />
+            <JoinById />
           </div>
         </div>
-
-        <div className="flex flex-col gap-6">
-          <WalletPanel />
-          <JoinById />
-        </div>
-      </div>
-
-      <StatusBar />
-    </main>
+      </main>
+    </div>
   );
 }

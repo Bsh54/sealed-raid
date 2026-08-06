@@ -10,12 +10,12 @@ import {
   useReadContract,
   useReadContracts,
   useSwitchChain,
-  useWaitForTransactionReceipt,
-  useWriteContract,
 } from "wagmi";
 import { sealedRaidContract } from "@/lib/contract";
+import { useBurner } from "@/lib/burner";
 
 const STAKES = [0.001, 0.005, 0.01];
+const GAS_BUFFER = parseEther("0.02");
 
 type M = readonly [
   `0x${string}`,
@@ -31,14 +31,16 @@ type M = readonly [
 
 export function FindMatch() {
   const router = useRouter();
-  const { address, isConnected } = useAccount();
+  const { isConnected } = useAccount();
   const chainId = useChainId();
   const { switchChain } = useSwitchChain();
+  const burner = useBurner();
 
   const [stake, setStake] = useState(STAKES[1]);
   const [searching, setSearching] = useState(false);
   const [searchId, setSearchId] = useState<bigint | null>(null);
   const [privateId, setPrivateId] = useState<bigint | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const wrongNetwork = isConnected && chainId !== baseSepolia.id;
   const stakeWei = parseEther(String(stake));
@@ -60,9 +62,6 @@ export function FindMatch() {
     query: { enabled: count > 0 && !searching },
   });
 
-  const { writeContract, data: hash } = useWriteContract();
-  const { data: receipt } = useWaitForTransactionReceipt({ hash });
-
   const { data: watched } = useReadContract({
     ...sealedRaidContract,
     functionName: "getMatch",
@@ -72,80 +71,58 @@ export function FindMatch() {
   });
 
   useEffect(() => {
-    if (!receipt) return;
-    for (const log of receipt.logs) {
-      try {
-        const ev = decodeEventLog({
-          abi: sealedRaidContract.abi,
-          data: log.data,
-          topics: log.topics,
-        });
-        if (ev.eventName === "MatchJoined") {
-          const args = ev.args as { id: bigint };
-          router.push(`/placement?id=${args.id.toString()}`);
-          return;
-        }
-        if (ev.eventName === "MatchCreated") {
-          const args = ev.args as { id: bigint; isPrivate: boolean };
-          setSearchId(args.id);
-          if (args.isPrivate) setPrivateId(args.id);
-          return;
-        }
-      } catch {
-        continue;
-      }
-    }
-  }, [receipt, router]);
-
-  useEffect(() => {
     if (searchId === null || !watched) return;
     const m = watched as M;
-    if (m[3] === 1) {
-      router.push(`/placement?id=${searchId.toString()}`);
-    }
+    if (m[3] === 1) router.push(`/placement?id=${searchId.toString()}`);
   }, [watched, searchId, router]);
 
-  function findMatch() {
-    const candidate = (all ?? [])
-      .map((r, i) => ({ id: i + 1, m: r.result as M | undefined }))
-      .find(
-        (x) =>
-          x.m &&
-          x.m[3] === 0 &&
-          x.m[8] === false &&
-          x.m[2] === stakeWei &&
-          address &&
-          x.m[0].toLowerCase() !== address.toLowerCase(),
-      );
+  async function start(isPrivate: boolean) {
+    setError(null);
     setSearching(true);
-    if (candidate) {
-      writeContract({
-        ...sealedRaidContract,
-        functionName: "joinMatch",
-        args: [BigInt(candidate.id)],
-        value: candidate.m![2],
-        chainId: baseSepolia.id,
-      });
-    } else {
-      writeContract({
-        ...sealedRaidContract,
-        functionName: "createMatch",
-        args: [false],
-        value: stakeWei,
-        chainId: baseSepolia.id,
-      });
+    try {
+      await burner.ensureFunded(stakeWei + GAS_BUFFER);
+      if (!isPrivate) {
+        const candidate = (all ?? [])
+          .map((r, i) => ({ id: i + 1, m: r.result as M | undefined }))
+          .find(
+            (x) =>
+              x.m &&
+              x.m[3] === 0 &&
+              x.m[8] === false &&
+              x.m[2] === stakeWei &&
+              x.m[0].toLowerCase() !== burner.address?.toLowerCase(),
+          );
+        if (candidate) {
+          await burner.writeGame("joinMatch", [BigInt(candidate.id)], candidate.m![2]);
+          router.push(`/placement?id=${candidate.id}`);
+          return;
+        }
+      }
+      const receipt = await burner.writeGame("createMatch", [isPrivate], stakeWei);
+      let id: bigint | null = null;
+      for (const log of receipt.logs) {
+        try {
+          const ev = decodeEventLog({
+            abi: sealedRaidContract.abi,
+            data: log.data,
+            topics: log.topics,
+          });
+          if (ev.eventName === "MatchCreated") {
+            id = (ev.args as { id: bigint }).id;
+            break;
+          }
+        } catch {
+          continue;
+        }
+      }
+      if (id !== null) {
+        setSearchId(id);
+        if (isPrivate) setPrivateId(id);
+      }
+    } catch (e) {
+      setSearching(false);
+      setError(e instanceof Error ? e.message.split("\n")[0] : "Failed");
     }
-  }
-
-  function createPrivate() {
-    setSearching(true);
-    writeContract({
-      ...sealedRaidContract,
-      functionName: "createMatch",
-      args: [true],
-      value: stakeWei,
-      chainId: baseSepolia.id,
-    });
   }
 
   function cancel() {
@@ -157,11 +134,31 @@ export function FindMatch() {
   if (wrongNetwork) {
     return (
       <div className="panel p-6">
-        <button
-          onClick={() => switchChain({ chainId: baseSepolia.id })}
-          className="term-btn w-full"
-        >
+        <button onClick={() => switchChain({ chainId: baseSepolia.id })} className="term-btn w-full">
           Switch to Base Sepolia
+        </button>
+      </div>
+    );
+  }
+
+  if (!isConnected) {
+    return (
+      <div className="panel p-6 text-center">
+        <p className="label-caps text-fg-dim">Connect wallet to play</p>
+      </div>
+    );
+  }
+
+  if (!burner.ready) {
+    return (
+      <div className="panel p-6 text-center">
+        <div className="label-caps mb-3 text-fg-dim">One-time setup</div>
+        <p className="mb-5 text-sm text-fg-dim">
+          Sign once to create your in-browser game key. After that you play with no wallet
+          popups — only a single top-up covers your stakes.
+        </p>
+        <button onClick={() => burner.create()} disabled={burner.creating} className="term-btn w-full">
+          {burner.creating ? "Signing..." : "Create Game Key"}
         </button>
       </div>
     );
@@ -178,10 +175,7 @@ export function FindMatch() {
             <div className="data mt-1 text-2xl text-fg">#{privateId.toString()}</div>
           </div>
         )}
-        <button
-          onClick={cancel}
-          className="label-caps mt-6 text-fg-dim hover:text-fg"
-        >
+        <button onClick={cancel} className="label-caps mt-6 text-fg-dim hover:text-fg">
           Cancel
         </button>
       </div>
@@ -205,23 +199,16 @@ export function FindMatch() {
           </button>
         ))}
       </div>
-      <button
-        onClick={findMatch}
-        disabled={!isConnected}
-        className="term-btn w-full disabled:cursor-not-allowed disabled:opacity-40"
-      >
+      <button onClick={() => start(false)} className="term-btn w-full">
         Find Match
       </button>
       <button
-        onClick={createPrivate}
-        disabled={!isConnected}
-        className="label-caps mt-3 w-full py-2 text-fg-dim hover:text-fg disabled:opacity-40"
+        onClick={() => start(true)}
+        className="label-caps mt-3 w-full py-2 text-fg-dim hover:text-fg"
       >
         Create Private Match
       </button>
-      {!isConnected && (
-        <p className="label-caps mt-3 text-center text-xs text-fg-dim">Connect wallet to play</p>
-      )}
+      {error && <p className="label-caps mt-3 break-words text-center text-xs text-ice">{error}</p>}
     </div>
   );
 }

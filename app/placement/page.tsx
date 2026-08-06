@@ -1,16 +1,13 @@
 "use client";
 
-import { Fragment, Suspense, useEffect, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { parseEther } from "viem";
 import { baseSepolia } from "wagmi/chains";
-import {
-  useAccount,
-  useReadContract,
-  useWaitForTransactionReceipt,
-  useWriteContract,
-} from "wagmi";
+import { useAccount, useReadContract } from "wagmi";
 import { sealedRaidContract, SEALED_RAID_ADDRESS } from "@/lib/contract";
 import { encryptCell } from "@/lib/inco";
+import { useBurner } from "@/lib/burner";
 
 const GRID = 36;
 const COLS = 6;
@@ -45,6 +42,7 @@ function Placement() {
   const matchId = params.get("id");
 
   const { address, isConnected } = useAccount();
+  const burner = useBurner();
   const [board, setBoard] = useState<Cell[]>(Array(GRID).fill(null));
   const [tool, setTool] = useState<Kind>("shard");
   const [status, setStatus] = useState<"idle" | "encrypting" | "committing">("idle");
@@ -55,26 +53,6 @@ function Placement() {
     functionName: "placementFee",
     chainId: baseSepolia.id,
   });
-
-  const { writeContract, data: hash, error: writeError } = useWriteContract();
-  const { data: receipt } = useWaitForTransactionReceipt({ hash });
-
-  useEffect(() => {
-    if (writeError) {
-      setStatus("idle");
-      setError(writeError.message.split("\n")[0]);
-    }
-  }, [writeError]);
-
-  useEffect(() => {
-    if (!receipt) return;
-    if (receipt.status === "success" && matchId) {
-      router.push(`/raid?id=${matchId}`);
-    } else if (receipt.status === "reverted") {
-      setStatus("idle");
-      setError("Commit transaction reverted");
-    }
-  }, [receipt, matchId, router]);
 
   const placedShards = board.filter((c) => c === "shard").length;
   const placedTraps = board.filter((c) => c === "ice").length;
@@ -98,7 +76,7 @@ function Placement() {
   }
 
   async function commit() {
-    if (!address || !matchId || fee === undefined) return;
+    if (!address || !matchId || fee === undefined || !burner.ready) return;
     setError(null);
     setStatus("encrypting");
     try {
@@ -109,13 +87,18 @@ function Placement() {
         }),
       );
       setStatus("committing");
-      writeContract({
-        ...sealedRaidContract,
-        functionName: "commitPlacement",
-        args: [BigInt(matchId), cells],
-        value: fee,
-        chainId: baseSepolia.id,
-      });
+      await burner.ensureFunded((fee as bigint) + parseEther("0.01"));
+      const receipt = await burner.writeGame(
+        "commitPlacement",
+        [BigInt(matchId), cells],
+        fee as bigint,
+      );
+      if (receipt.status === "success") {
+        router.push(`/raid?id=${matchId}`);
+      } else {
+        setStatus("idle");
+        setError("Commit transaction reverted");
+      }
     } catch (e) {
       setStatus("idle");
       setError(e instanceof Error ? e.message.split("\n")[0] : "Encryption failed");
@@ -124,13 +107,13 @@ function Placement() {
 
   const label = !isConnected
     ? "Connect wallet"
-    : status === "encrypting"
-      ? "Encrypting placement..."
-      : status === "committing"
-        ? hash
+    : !burner.ready
+      ? "Create game key first"
+      : status === "encrypting"
+        ? "Encrypting placement..."
+        : status === "committing"
           ? "Committing on-chain..."
-          : "Confirm in wallet..."
-        : "Encrypt & Commit";
+          : "Encrypt & Commit";
 
   return (
     <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col justify-center px-4 py-6 lg:px-8">

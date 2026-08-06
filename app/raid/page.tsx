@@ -4,11 +4,13 @@ import { Suspense, useCallback, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type HexString } from "@inco/lightning-js";
 import { baseSepolia } from "wagmi/chains";
-import { useAccount, usePublicClient, useWriteContract } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { sealedRaidContract } from "@/lib/contract";
+import { useBurner } from "@/lib/burner";
 import { revealHandle } from "@/lib/inco-attestation";
 
 const GRID = 36;
+const ZERO_HANDLE = "0x" + "0".repeat(64);
 
 type Content = 0 | 1 | 2;
 
@@ -37,25 +39,26 @@ function Raid() {
   const matchId = idParam && /^\d+$/.test(idParam) ? BigInt(idParam) : null;
 
   const { address } = useAccount();
+  const burner = useBurner();
   const client = usePublicClient({ chainId: baseSepolia.id });
-  const { writeContractAsync } = useWriteContract();
 
   const [host, setHost] = useState<string | null>(null);
   const [guest, setGuest] = useState<string | null>(null);
-  const [phase, setPhase] = useState<number>(0);
-  const [turn, setTurn] = useState<number>(0);
-  const [hostScore, setHostScore] = useState<number>(0);
-  const [guestScore, setGuestScore] = useState<number>(0);
+  const [phase, setPhase] = useState(0);
+  const [turn, setTurn] = useState(0);
+  const [hostScore, setHostScore] = useState(0);
+  const [guestScore, setGuestScore] = useState(0);
   const [winner, setWinner] = useState<string | null>(null);
   const [opened, setOpened] = useState<Record<number, Content>>({});
   const [pending, setPending] = useState<Record<number, boolean>>({});
   const [step, setStep] = useState<"idle" | "raiding" | "revealing" | "settling">("idle");
   const [error, setError] = useState<string | null>(null);
 
-  const mySeat = address
-    ? address.toLowerCase() === host?.toLowerCase()
+  const me = burner.address ?? address;
+  const mySeat = me
+    ? me.toLowerCase() === host?.toLowerCase()
       ? 0
-      : address.toLowerCase() === guest?.toLowerCase()
+      : me.toLowerCase() === guest?.toLowerCase()
         ? 1
         : -1
     : -1;
@@ -77,21 +80,18 @@ function Raid() {
     setGuestScore(m[6]);
     setWinner(m[7] === "0x0000000000000000000000000000000000000000" ? null : m[7]);
 
-    const logs = await client.getContractEvents({
+    const seat = m[0].toLowerCase() === (me ?? "").toLowerCase() ? 1 : 0;
+    const cells = (await client.readContract({
       ...sealedRaidContract,
-      eventName: "CellRevealed",
-      args: { id: matchId },
-      fromBlock: BigInt(0),
-    });
+      functionName: "getRevealedBoard",
+      args: [matchId, seat],
+    })) as readonly number[];
     const map: Record<number, Content> = {};
-    for (const log of logs) {
-      const a = log.args as { byPlayer: number; pos: bigint; content: bigint };
-      if (Number(a.byPlayer) === mySeat) {
-        map[Number(a.pos)] = Number(a.content) as Content;
-      }
-    }
+    cells.forEach((v, i) => {
+      if (v > 0) map[i] = (v - 1) as Content;
+    });
     setOpened(map);
-  }, [client, matchId, mySeat]);
+  }, [client, matchId, me]);
 
   useEffect(() => {
     refresh();
@@ -106,36 +106,27 @@ function Raid() {
   }, [phase, matchId, router]);
 
   async function raidCell(pos: number) {
-    if (!client || matchId === null || !isMyTurn) return;
+    if (!client || matchId === null || !isMyTurn || !burner.ready) return;
     setError(null);
     setPending((p) => ({ ...p, [pos]: true }));
     try {
       setStep("raiding");
-      const raidHash = await writeContractAsync({
-        ...sealedRaidContract,
-        functionName: "raid",
-        args: [matchId, BigInt(pos)],
-        chainId: baseSepolia.id,
-      });
-      await client.waitForTransactionReceipt({ hash: raidHash });
+      await burner.writeGame("raid", [matchId, BigInt(pos)]);
 
       const handle = (await client.readContract({
         ...sealedRaidContract,
         functionName: "pendingHandle",
         args: [matchId],
       })) as HexString;
+      if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
+        throw new Error("No pending handle after raid");
+      }
 
       setStep("revealing");
       const { attestation, signatures } = await revealHandle(handle);
 
       setStep("settling");
-      const settleHash = await writeContractAsync({
-        ...sealedRaidContract,
-        functionName: "settleRaid",
-        args: [matchId, attestation, signatures],
-        chainId: baseSepolia.id,
-      });
-      await client.waitForTransactionReceipt({ hash: settleHash });
+      await burner.writeGame("settleRaid", [matchId, attestation, signatures]);
 
       await refresh();
     } catch (e) {
@@ -242,11 +233,6 @@ function Raid() {
       </div>
 
       {error && <p className="label-caps mt-4 break-words text-center text-ice">{error}</p>}
-      {winner && (
-        <p className="label-caps mt-4 text-center text-shard">
-          Winner: {winner.slice(0, 6)}...{winner.slice(-4)}
-        </p>
-      )}
     </div>
   );
 }
