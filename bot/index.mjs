@@ -6,6 +6,7 @@ import {
   pad,
   toHex,
   bytesToHex,
+  parseEther,
   nonceManager,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
@@ -132,9 +133,8 @@ async function maybeJoin(id) {
       active.delete(id);
       return;
     }
-    const fee = await read("joinFee");
     console.log(`[${id}] bot joining (stake ${stake})`);
-    await write("joinMatch", [BigInt(id)], stake + fee);
+    await write("joinMatch", [BigInt(id)], stake + parseEther("0.0005"));
     await playMatch(id);
   } catch (e) {
     console.warn(`[${id}] join/play error:`, e.shortMessage || e.message);

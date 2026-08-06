@@ -9,6 +9,7 @@ import { sealedRaidContract } from "@/lib/contract";
 import { useBurner } from "@/lib/burner";
 
 const GAS_BUFFER = parseEther("0.02");
+const JOIN_BUFFER = parseEther("0.0005");
 
 export function JoinById() {
   const router = useRouter();
@@ -24,20 +25,14 @@ export function JoinById() {
     chainId: baseSepolia.id,
     query: { enabled: id !== null },
   });
-  const { data: fee } = useReadContract({
-    ...sealedRaidContract,
-    functionName: "joinFee",
-    chainId: baseSepolia.id,
-  });
 
   async function join() {
     if (id === null || !match || !burner.ready) return;
     const stake = (match as readonly unknown[])[2] as bigint;
-    const joinFee = (fee as bigint) ?? parseEther("0.001");
     setBusy(true);
     try {
-      await burner.ensureFunded(stake + joinFee + GAS_BUFFER);
-      await burner.writeGame("joinMatch", [id], stake + joinFee);
+      await burner.ensureFunded(stake + JOIN_BUFFER + GAS_BUFFER);
+      await burner.writeGame("joinMatch", [id], stake + JOIN_BUFFER);
       router.push(`/raid?id=${id.toString()}`);
     } catch {
       setBusy(false);

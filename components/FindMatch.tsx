@@ -16,6 +16,7 @@ import { useBurner } from "@/lib/burner";
 
 const STAKES = [0.001, 0.005, 0.01];
 const GAS_BUFFER = parseEther("0.02");
+const JOIN_BUFFER = parseEther("0.0005");
 
 type M = readonly [
   `0x${string}`,
@@ -48,11 +49,6 @@ export function FindMatch() {
     functionName: "nextMatchId",
     chainId: baseSepolia.id,
   });
-  const { data: fee } = useReadContract({
-    ...sealedRaidContract,
-    functionName: "joinFee",
-    chainId: baseSepolia.id,
-  });
   const count = nextId ? Number(nextId) - 1 : 0;
 
   const { data: all } = useReadContracts({
@@ -69,8 +65,7 @@ export function FindMatch() {
     setError(null);
     setBusy(true);
     try {
-      const joinFee = (fee as bigint) ?? parseEther("0.001");
-      await burner.ensureFunded(stakeWei + joinFee + GAS_BUFFER);
+      await burner.ensureFunded(stakeWei + JOIN_BUFFER + GAS_BUFFER);
 
       if (!isPrivate) {
         const candidate = (all ?? [])
@@ -84,7 +79,7 @@ export function FindMatch() {
               x.m[0].toLowerCase() !== burner.address?.toLowerCase(),
           );
         if (candidate) {
-          await burner.writeGame("joinMatch", [BigInt(candidate.id)], candidate.m![2] + joinFee);
+          await burner.writeGame("joinMatch", [BigInt(candidate.id)], candidate.m![2] + JOIN_BUFFER);
           router.push(`/raid?id=${candidate.id}`);
           return;
         }
