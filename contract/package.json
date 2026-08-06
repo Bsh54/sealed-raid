@@ -1,0 +1,30 @@
+{
+  "name": "sealed-raid-contract",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "test:basesepolia": "hardhat test --network baseSepolia",
+    "deploy:basesepolia": "hardhat run scripts/deploy.ts --network baseSepolia",
+    "verify:basesepolia": "hardhat verify --network baseSepolia"
+  },
+  "dependencies": {
+    "@inco/lightning": "^1.0.2",
+    "@openzeppelin/contracts": "^5.2.0",
+    "dotenv": "^16.4.7"
+  },
+  "devDependencies": {
+    "@inco/lightning-js": "^1.0.2",
+    "@nomicfoundation/hardhat-chai-matchers": "^2.0.9",
+    "@nomicfoundation/hardhat-toolbox-viem": "^3.0.0",
+    "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@typechain/hardhat": "^9.1.0",
+    "@types/node": ">=18.0.0",
+    "hardhat": "^2.24.3",
+    "ts-node": ">=8.0.0",
+    "typechain": "^8.3.2",
+    "typescript": "~5.5.4",
+    "viem": "^2.7.6"
+  }
+}
