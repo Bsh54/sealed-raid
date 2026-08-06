@@ -169,10 +169,30 @@ async function maybeJoin(id) {
   }
 }
 
-async function scanExisting() {
+const firstSeen = new Map();
+
+async function scan() {
   const nextId = await read("nextMatchId");
-  for (let id = 1; id < Number(nextId); id++) {
-    maybeJoin(id);
+  const count = Number(nextId) - 1;
+  for (let id = 1; id <= count; id++) {
+    if (active.has(id)) continue;
+    const m = await read("getMatch", [BigInt(id)]);
+    const host = m[0];
+    const phase = m[3];
+    const isPrivate = m[8];
+    if (phase !== 0 || isPrivate) {
+      firstSeen.delete(id);
+      continue;
+    }
+    if (host.toLowerCase() === account.address.toLowerCase()) continue;
+    if (!firstSeen.has(id)) {
+      firstSeen.set(id, Date.now());
+      console.log(`public match ${id} seen, joining in ${JOIN_DELAY_MS}ms if still open`);
+      continue;
+    }
+    if (Date.now() - firstSeen.get(id) >= JOIN_DELAY_MS) {
+      maybeJoin(id);
+    }
   }
 }
 
@@ -183,23 +203,9 @@ async function main() {
   const bal = await publicClient.getBalance({ address: account.address });
   console.log("balance:", bal.toString(), "wei");
 
-  await scanExisting();
-
-  publicClient.watchContractEvent({
-    ...contract,
-    eventName: "MatchCreated",
-    poll: true,
-    pollingInterval: 4000,
-    onLogs: (logs) => {
-      for (const log of logs) {
-        const { id, isPrivate } = log.args;
-        if (isPrivate) continue;
-        console.log(`new public match ${id}, joining in ${JOIN_DELAY_MS}ms if still open`);
-        setTimeout(() => maybeJoin(Number(id)), JOIN_DELAY_MS);
-      }
-    },
-    onError: (e) => console.warn("watch error:", e.message),
-  });
+  setInterval(() => {
+    scan().catch((e) => console.warn("scan error:", e.shortMessage || e.message));
+  }, 4000);
 }
 
 main().catch((e) => {
