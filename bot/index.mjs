@@ -110,16 +110,15 @@ async function pickCell(id) {
 async function commitPlacement(id) {
   const board = randomBoard();
   const z = await getZap();
-  const cells = [];
-  for (const c of board) {
-    cells.push(
-      await z.encrypt(BigInt(c), {
+  const cells = await Promise.all(
+    board.map((c) =>
+      z.encrypt(BigInt(c), {
         accountAddress: account.address,
         dappAddress: CONTRACT,
         handleType: handleTypes.euint256,
       }),
-    );
-  }
+    ),
+  );
   const fee = await read("placementFee");
   await write("commitPlacement", [BigInt(id), cells], fee);
   console.log(`[${id}] bot committed placement`);

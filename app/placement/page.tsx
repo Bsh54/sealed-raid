@@ -102,11 +102,12 @@ function Placement() {
     setError(null);
     setStatus("encrypting");
     try {
-      const cells: `0x${string}`[] = [];
-      for (let i = 0; i < GRID; i++) {
-        const content = board[i] === "shard" ? 1 : board[i] === "ice" ? 2 : 0;
-        cells.push(await encryptCell(content, address, SEALED_RAID_ADDRESS));
-      }
+      const cells = await Promise.all(
+        Array.from({ length: GRID }, (_, i) => {
+          const content = board[i] === "shard" ? 1 : board[i] === "ice" ? 2 : 0;
+          return encryptCell(content, address, SEALED_RAID_ADDRESS);
+        }),
+      );
       setStatus("committing");
       writeContract({
         ...sealedRaidContract,

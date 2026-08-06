@@ -159,7 +159,7 @@ function Raid() {
       : step === "raiding"
         ? "Raiding cell..."
         : step === "revealing"
-          ? "Decrypting result..."
+          ? "Decrypting via Inco (~1-2 min)..."
           : step === "settling"
             ? "Settling on-chain..."
             : isMyTurn
