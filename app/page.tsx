@@ -1,3 +1,5 @@
+import { ConnectWallet } from "@/components/ConnectWallet";
+
 const activeMatches = [
   {
     opponent: "Vyper",
@@ -162,7 +164,7 @@ export default function DashboardPage() {
       <main className="flex-1">
         <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
           <Logo />
-          <button className="term-btn">Connect Wallet</button>
+          <ConnectWallet />
         </header>
 
         <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
