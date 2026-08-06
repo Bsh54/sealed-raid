@@ -193,4 +193,8 @@ contract SealedRaid {
     function isRaided(uint256 id, uint8 player, uint256 pos) external view returns (bool) {
         return raided[id][player][pos];
     }
+
+    function placementFee() external view returns (uint256) {
+        return inco.getFee() * GRID;
+    }
 }
