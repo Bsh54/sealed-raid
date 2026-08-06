@@ -130,12 +130,12 @@ export default function DashboardPage() {
           <section>
             <SectionHeader title="Open Matches" note={`${openMatches.length} Awaiting`} />
             <div className="flex flex-col gap-3">
+              <JoinById />
               {openMatches.length === 0 ? (
                 <EmptyState label="No open challenges — create one" />
               ) : (
                 openMatches.map((m) => <OpenMatchRow key={m.id} match={m} />)
               )}
-              <JoinById />
             </div>
           </section>
 
