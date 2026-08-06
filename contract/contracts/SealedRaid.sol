@@ -3,7 +3,6 @@ pragma solidity ^0.8.30;
 
 import {euint256, e, inco, elist, ETypes} from "@inco/lightning/src/Lib.sol";
 import {DecryptionAttestation} from "@inco/lightning/src/lightning-parts/DecryptionAttester.types.sol";
-import {asUint256} from "@inco/lightning/src/shared/TypeUtils.sol";
 
 contract SealedRaid {
     using e for *;
@@ -136,7 +135,7 @@ contract SealedRaid {
         uint8 idx = m.turn;
         uint8 opp = 1 - idx;
         uint256 pos = pendingPos[id];
-        uint256 content = asUint256(attestation.value);
+        uint256 content = uint256(attestation.value);
 
         raided[id][opp][pos] = true;
         pendingHandle[id] = bytes32(0);
