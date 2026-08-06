@@ -140,7 +140,7 @@ function Placement() {
       </header>
 
       <div className="grid items-center gap-8 lg:grid-cols-[240px_1fr]">
-        <div className="flex flex-col gap-4">
+        <div className="order-2 flex flex-col gap-4 lg:order-1">
           <button
             onClick={() => setTool("shard")}
             disabled={busy}
@@ -179,7 +179,7 @@ function Placement() {
         </div>
 
         <div
-          className="panel w-full p-3 sm:p-4"
+          className="panel order-1 w-full p-3 sm:p-4 lg:order-2"
           style={{ maxWidth: "min(90vw, 56vh)" }}
         >
           <div className="mb-1.5 grid grid-cols-[18px_repeat(6,1fr)] gap-1.5">
