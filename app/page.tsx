@@ -1,11 +1,12 @@
 import { ConnectWallet } from "@/components/ConnectWallet";
+import { NewMatch } from "@/components/NewMatch";
 
 const activeMatches = [
   {
     opponent: "Vyper",
     stake: 10,
     id: "0xA9...2F",
-    status: "YOUR TURN REQUIRED",
+    status: "YOUR TURN",
     live: true,
   },
   {
@@ -16,8 +17,6 @@ const activeMatches = [
     live: false,
   },
 ];
-
-const navItems = ["Terminal", "Arena", "Leaderboard", "Vault"];
 
 function Logo() {
   return (
@@ -36,49 +35,16 @@ function Logo() {
   );
 }
 
-function Sidebar() {
+function JackpotRibbon() {
   return (
-    <aside className="hidden w-56 shrink-0 flex-col justify-between border-r border-line p-4 lg:flex">
-      <div>
-        <div className="mb-8 flex items-center gap-3 panel p-3">
-          <div className="h-8 w-8 border border-line bg-surface-2" />
-          <div className="leading-tight">
-            <div className="label-caps text-fg-dim">Operator_0x1</div>
-            <div className="data mt-1 text-sm text-shard">2,450.00 USDC</div>
-          </div>
-        </div>
-        <nav className="flex flex-col gap-1">
-          {navItems.map((item, i) => (
-            <button
-              key={item}
-              className={`label-caps flex items-center gap-3 px-3 py-3 text-left transition-colors ${
-                i === 0
-                  ? "border-l-2 border-shard bg-surface text-shard"
-                  : "text-fg-dim hover:text-fg"
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </nav>
+    <div className="panel flex flex-wrap items-center justify-between gap-2 px-5 py-3">
+      <div className="label-caps flex items-center gap-2 text-shard">
+        <span className="h-1.5 w-1.5 bg-shard" />
+        Daily Megapot Jackpot
       </div>
-      <div className="flex flex-col gap-1">
-        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Settings</button>
-        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Support</button>
-      </div>
-    </aside>
-  );
-}
-
-function JackpotBanner() {
-  return (
-    <div className="panel relative overflow-hidden p-6">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="label-caps text-fg-dim">Total Megapot Jackpot</div>
-          <div className="data mt-2 text-4xl font-bold text-shard">$25,430.12</div>
-        </div>
-        <button className="term-btn">Play Now</button>
+      <div className="flex items-center gap-6">
+        <span className="data text-lg font-bold text-shard">$25,430.12</span>
+        <span className="data text-xs text-fg-dim">next draw 14h 22m</span>
       </div>
     </div>
   );
@@ -91,19 +57,15 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
         <div className="h-10 w-10 border border-line bg-surface-2" />
         <div>
           <div className="font-semibold">VS. {match.opponent}</div>
-          <div
-            className={`label-caps mt-1 ${
-              match.live ? "text-shard" : "text-fg-dim"
-            }`}
-          >
+          <div className={`label-caps mt-1 ${match.live ? "text-shard" : "text-fg-dim"}`}>
             {match.status}
           </div>
         </div>
       </div>
       <div className="flex items-center gap-6">
-        <div className="hidden text-right sm:block">
+        <div className="text-right">
           <div className="data text-sm text-fg">{match.stake} USDC</div>
-          <div className="data mt-1 text-xs text-fg-dim">ID: {match.id}</div>
+          <div className="data mt-1 text-xs text-fg-dim">{match.id}</div>
         </div>
         {match.live ? (
           <button className="term-btn">Enter</button>
@@ -115,82 +77,34 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
   );
 }
 
-function NewMatchPanel() {
-  return (
-    <div className="panel p-5">
-      <div className="label-caps mb-4 text-fg-dim">Initiate New Match</div>
-      <div className="label-caps mb-2 text-xs text-fg-dim">Select Staking Parameter (USDC)</div>
-      <div className="mb-4 grid grid-cols-3 gap-2">
-        {[1, 5, 10].map((v, i) => (
-          <button
-            key={v}
-            className={`data border py-2 text-sm ${
-              i === 1
-                ? "border-shard text-shard"
-                : "border-line text-fg-dim hover:text-fg"
-            }`}
-          >
-            {v}
-          </button>
-        ))}
-      </div>
-      <button className="term-btn w-full">Quick Match</button>
-    </div>
-  );
-}
-
-function JackpotStatus() {
-  return (
-    <div className="panel p-5">
-      <div className="label-caps mb-3 text-fg-dim">Daily Jackpot Status</div>
-      <div className="label-caps text-ice">Entry Secured</div>
-      <div className="data mt-2 text-xs text-fg-dim">Next draw in 14h 22m</div>
-      <div className="mt-3 flex gap-1">
-        {Array.from({ length: 10 }).map((_, i) => (
-          <div
-            key={i}
-            className={`h-1.5 flex-1 ${i < 6 ? "bg-ice" : "bg-muted/30"}`}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export default function DashboardPage() {
   return (
-    <div className="flex min-h-full flex-1">
-      <Sidebar />
-      <main className="flex-1">
-        <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
-          <Logo />
-          <ConnectWallet />
-        </header>
+    <main className="mx-auto w-full max-w-3xl flex-1 px-4 py-6">
+      <header className="mb-6 flex items-center justify-between">
+        <Logo />
+        <ConnectWallet />
+      </header>
 
-        <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
-          <div className="flex flex-col gap-6 lg:col-span-2">
-            <JackpotBanner />
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Active Matches</h2>
-                <span className="label-caps text-fg-dim">
-                  {activeMatches.length} Encrypted Sessions
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                {activeMatches.map((m) => (
-                  <MatchRow key={m.id} match={m} />
-                ))}
-              </div>
-            </div>
-          </div>
+      <JackpotRibbon />
 
-          <div className="flex flex-col gap-6">
-            <JackpotStatus />
-            <NewMatchPanel />
-          </div>
+      <section className="mt-8">
+        <div className="mb-4 flex items-center justify-between gap-4">
+          <h2 className="text-lg font-semibold">
+            Active Matches
+            <span className="label-caps ml-2 text-fg-dim">{activeMatches.length}</span>
+          </h2>
         </div>
-      </main>
-    </div>
+
+        <div className="mb-4">
+          <NewMatch />
+        </div>
+
+        <div className="flex flex-col gap-3">
+          {activeMatches.map((m) => (
+            <MatchRow key={m.id} match={m} />
+          ))}
+        </div>
+      </section>
+    </main>
   );
 }
