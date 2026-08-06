@@ -1,12 +1,21 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment, Suspense, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { baseSepolia } from "wagmi/chains";
+import {
+  useAccount,
+  useReadContract,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
+import { sealedRaidContract, SEALED_RAID_ADDRESS } from "@/lib/contract";
+import { encryptCell } from "@/lib/inco";
 
 const GRID = 36;
 const COLS = 6;
 const TOTAL_SHARDS = 5;
 const TOTAL_TRAPS = 6;
-
 const ROW_LABELS = ["A", "B", "C", "D", "E", "F"];
 
 type Kind = "shard" | "ice";
@@ -30,15 +39,36 @@ function IceIcon({ className = "" }: { className?: string }) {
   );
 }
 
-export default function PlacementPage() {
+function Placement() {
+  const params = useSearchParams();
+  const router = useRouter();
+  const matchId = params.get("id");
+
+  const { address, isConnected } = useAccount();
   const [board, setBoard] = useState<Cell[]>(Array(GRID).fill(null));
   const [tool, setTool] = useState<Kind>("shard");
+  const [status, setStatus] = useState<"idle" | "encrypting" | "committing">("idle");
+
+  const { data: fee } = useReadContract({
+    ...sealedRaidContract,
+    functionName: "placementFee",
+    chainId: baseSepolia.id,
+  });
+
+  const { writeContract, data: hash } = useWriteContract();
+  const { isSuccess } = useWaitForTransactionReceipt({ hash });
+
+  if (isSuccess && matchId) {
+    router.push(`/raid?id=${matchId}`);
+  }
 
   const placedShards = board.filter((c) => c === "shard").length;
   const placedTraps = board.filter((c) => c === "ice").length;
   const ready = placedShards === TOTAL_SHARDS && placedTraps === TOTAL_TRAPS;
+  const busy = status !== "idle";
 
   function toggle(i: number) {
+    if (busy) return;
     setBoard((prev) => {
       const next = [...prev];
       if (next[i] === tool) {
@@ -53,6 +83,36 @@ export default function PlacementPage() {
     });
   }
 
+  async function commit() {
+    if (!address || !matchId || fee === undefined) return;
+    setStatus("encrypting");
+    try {
+      const cells: `0x${string}`[] = [];
+      for (let i = 0; i < GRID; i++) {
+        const content = board[i] === "shard" ? 1 : board[i] === "ice" ? 2 : 0;
+        cells.push(await encryptCell(content, address, SEALED_RAID_ADDRESS));
+      }
+      setStatus("committing");
+      writeContract({
+        ...sealedRaidContract,
+        functionName: "commitPlacement",
+        args: [BigInt(matchId), cells],
+        value: fee,
+        chainId: baseSepolia.id,
+      });
+    } catch {
+      setStatus("idle");
+    }
+  }
+
+  const label = !isConnected
+    ? "Connect wallet"
+    : status === "encrypting"
+      ? "Encrypting placement..."
+      : status === "committing"
+        ? "Confirm in wallet..."
+        : "Encrypt & Commit";
+
   return (
     <div className="mx-auto w-full max-w-6xl px-4 py-8 lg:px-8">
       <header className="mb-8 flex flex-wrap items-center justify-between gap-4">
@@ -62,7 +122,7 @@ export default function PlacementPage() {
           </h1>
           <p className="mt-3 max-w-md text-sm text-fg-dim panel p-3">
             Deploy {TOTAL_SHARDS} Shards and {TOTAL_TRAPS} ICE Traps. Your placement is
-            encrypted client-side using Inco FHE.
+            encrypted client-side using Inco FHE before it ever leaves your browser.
           </p>
         </div>
         <div className="label-caps flex items-center gap-2 border border-shard/40 px-3 py-2 text-shard">
@@ -77,6 +137,7 @@ export default function PlacementPage() {
         <div className="flex flex-col gap-4">
           <button
             onClick={() => setTool("shard")}
+            disabled={busy}
             className={`panel flex flex-col items-center gap-2 p-6 transition-colors ${
               tool === "shard" ? "border-shard text-shard glow-shard" : "text-fg-dim"
             }`}
@@ -89,6 +150,7 @@ export default function PlacementPage() {
 
           <button
             onClick={() => setTool("ice")}
+            disabled={busy}
             className={`panel flex flex-col items-center gap-2 p-6 transition-colors ${
               tool === "ice" ? "border-ice text-ice glow-ice" : "text-fg-dim"
             }`}
@@ -100,11 +162,15 @@ export default function PlacementPage() {
           </button>
 
           <button
-            disabled={!ready}
+            onClick={commit}
+            disabled={!ready || !isConnected || busy || !matchId}
             className="term-btn mt-2 w-full disabled:cursor-not-allowed disabled:opacity-40"
           >
-            Encrypt & Commit
+            {label}
           </button>
+          {!matchId && (
+            <p className="label-caps text-xs text-ice">No match id in URL</p>
+          )}
         </div>
 
         <div className="panel p-4 sm:p-6">
@@ -146,5 +212,13 @@ export default function PlacementPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PlacementPage() {
+  return (
+    <Suspense>
+      <Placement />
+    </Suspense>
   );
 }
