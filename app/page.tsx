@@ -18,8 +18,6 @@ const activeMatches = [
   },
 ];
 
-const navItems = ["Terminal", "Arena", "Leaderboard", "Vault"];
-
 function Logo() {
   return (
     <div className="flex items-center gap-3">
@@ -34,31 +32,6 @@ function Logo() {
         <div className="label-caps mt-1 text-fg-dim">Encrypted PvP // Base</div>
       </div>
     </div>
-  );
-}
-
-function Sidebar() {
-  return (
-    <aside className="hidden w-56 shrink-0 flex-col justify-between border-r border-line p-4 lg:flex">
-      <nav className="flex flex-col gap-1">
-        {navItems.map((item, i) => (
-          <button
-            key={item}
-            className={`label-caps flex items-center gap-3 px-3 py-3 text-left transition-colors ${
-              i === 0
-                ? "border-l-2 border-shard bg-surface text-shard"
-                : "text-fg-dim hover:text-fg"
-            }`}
-          >
-            {item}
-          </button>
-        ))}
-      </nav>
-      <div className="flex flex-col gap-1">
-        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Settings</button>
-        <button className="label-caps px-3 py-2 text-left text-fg-dim hover:text-fg">Support</button>
-      </div>
-    </aside>
   );
 }
 
@@ -108,37 +81,34 @@ function MatchRow({ match }: { match: (typeof activeMatches)[number] }) {
 
 export default function DashboardPage() {
   return (
-    <div className="flex min-h-full flex-1">
-      <Sidebar />
-      <main className="flex-1">
-        <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
-          <Logo />
-          <ConnectWallet />
-        </header>
+    <main className="flex-1">
+      <header className="flex items-center justify-between border-b border-line p-4 lg:px-8">
+        <Logo />
+        <ConnectWallet />
+      </header>
 
-        <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
-          <div className="flex flex-col gap-6 lg:col-span-2">
-            <JackpotBanner />
-            <div>
-              <div className="mb-3 flex items-center justify-between">
-                <h2 className="text-lg font-semibold">Active Matches</h2>
-                <span className="label-caps text-fg-dim">
-                  {activeMatches.length} Encrypted Sessions
-                </span>
-              </div>
-              <div className="flex flex-col gap-3">
-                {activeMatches.map((m) => (
-                  <MatchRow key={m.id} match={m} />
-                ))}
-              </div>
+      <div className="grid gap-6 p-4 lg:grid-cols-3 lg:p-8">
+        <div className="flex flex-col gap-6 lg:col-span-2">
+          <JackpotBanner />
+          <div>
+            <div className="mb-3 flex items-center justify-between">
+              <h2 className="text-lg font-semibold">Active Matches</h2>
+              <span className="label-caps text-fg-dim">
+                {activeMatches.length} Encrypted Sessions
+              </span>
+            </div>
+            <div className="flex flex-col gap-3">
+              {activeMatches.map((m) => (
+                <MatchRow key={m.id} match={m} />
+              ))}
             </div>
           </div>
-
-          <div className="flex flex-col gap-6">
-            <NewMatch />
-          </div>
         </div>
-      </main>
-    </div>
+
+        <div className="flex flex-col gap-6">
+          <NewMatch />
+        </div>
+      </div>
+    </main>
   );
 }
