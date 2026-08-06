@@ -56,14 +56,19 @@ function randomBoard() {
 }
 async function reveal(handle) {
   const z = await getZap();
-  const [r] = await z.attestedReveal([handle], {
-    backoffConfig: {
-      maxRetries: 40,
-      baseDelayInMs: 3000,
-      backoffFactor: 1.05,
-      errHandler: () => "continue",
-    },
-  });
+  const deadline = Date.now() + 12 * 60 * 1000;
+  let r = null;
+  while (Date.now() < deadline) {
+    try {
+      [r] = await z.attestedReveal([handle], {
+        backoffConfig: { maxRetries: 2, baseDelayInMs: 1000, backoffFactor: 1.2, errHandler: () => "continue" },
+      });
+      break;
+    } catch {
+      await sleep(8000);
+    }
+  }
+  if (!r) throw new Error("reveal timed out");
   const raw = r.plaintext.value;
   const numeric = typeof raw === "boolean" ? (raw ? 1 : 0) : raw;
   return {
@@ -157,12 +162,13 @@ async function main() {
         continue;
       }
       try {
+        const t0 = Date.now();
         await write("raid", [BigInt(id), BigInt(pos)]);
         const handle = await read("pendingHandle", [BigInt(id)]);
         const { attestation, signatures } = await reveal(handle);
         await write("settleRaid", [BigInt(id), attestation, signatures]);
         const mm = await read("getMatch", [BigInt(id)]);
-        console.log(`player raided ${pos} | scores ${mm[5]}-${mm[6]}`);
+        console.log(`player raided ${pos} in ${((Date.now() - t0) / 1000).toFixed(0)}s | scores ${mm[5]}-${mm[6]}`);
       } catch (e) {
         console.warn("raid err:", e.shortMessage || e.message);
         await sleep(2000);
