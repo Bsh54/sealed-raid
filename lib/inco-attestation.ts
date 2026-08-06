@@ -14,13 +14,10 @@ export function getZap() {
 }
 
 const REVEAL_BACKOFF = {
-  maxRetries: 20,
-  baseDelayInMs: 300,
-  backoffFactor: 1.3,
-  errHandler: (error: Error) => {
-    console.warn(`Retrying reveal: ${error.message}`);
-    return "continue" as const;
-  },
+  maxRetries: 40,
+  baseDelayInMs: 3000,
+  backoffFactor: 1.05,
+  errHandler: () => "continue" as const,
 };
 
 export interface AttestationResult {

@@ -3,9 +3,11 @@ import {
   createPublicClient,
   createWalletClient,
   http,
+  parseEther,
   pad,
   toHex,
   bytesToHex,
+  decodeEventLog,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
@@ -13,60 +15,34 @@ import { Lightning } from "@inco/lightning-js/lite";
 import { handleTypes } from "@inco/lightning-js";
 import { sealedRaidAbi } from "./abi.mjs";
 
-const RPC = process.env.RPC_URL || "https://sepolia.base.org";
+const RPC = "https://sepolia.base.org";
 const CONTRACT = process.env.CONTRACT_ADDRESS;
-const KEY = process.env.BOT_PRIVATE_KEY;
-const JOIN_DELAY_MS = Number(process.env.JOIN_DELAY_MS || 10000);
-
-if (!CONTRACT || !KEY) {
-  console.error("Missing CONTRACT_ADDRESS or BOT_PRIVATE_KEY in .env");
-  process.exit(1);
-}
-
+const KEY = process.env.PLAYER_KEY;
 const GRID = 36;
 const SHARDS = 5;
 const TRAPS = 6;
-const BOT_SEAT = 1;
-const OPP_SEAT = 0;
+const HOST_SEAT = 0;
+const OPP_SEAT = 1;
 
 const account = privateKeyToAccount(KEY.startsWith("0x") ? KEY : `0x${KEY}`);
 const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
 const walletClient = createWalletClient({ account, chain: baseSepolia, transport: http(RPC) });
 const contract = { address: CONTRACT, abi: sealedRaidAbi };
-
-const active = new Set();
-let zap = null;
-
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let zap = null;
 
 async function getZap() {
   if (!zap) zap = await Lightning.baseSepoliaTestnet({ hostChainRpcUrls: [RPC] });
   return zap;
 }
-
 async function read(fn, args = []) {
   return publicClient.readContract({ ...contract, functionName: fn, args });
 }
-
-let writeLock = Promise.resolve();
-
-function serialize(task) {
-  const run = writeLock.then(task, task);
-  writeLock = run.then(
-    () => undefined,
-    () => undefined,
-  );
-  return run;
-}
-
 async function write(fn, args, value) {
-  return serialize(async () => {
-    const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
-    await publicClient.waitForTransactionReceipt({ hash });
-    return hash;
-  });
+  const hash = await walletClient.writeContract({ ...contract, functionName: fn, args, value });
+  await publicClient.waitForTransactionReceipt({ hash });
+  return hash;
 }
-
 function randomBoard() {
   const idx = [...Array(GRID).keys()];
   for (let i = idx.length - 1; i > 0; i--) {
@@ -78,7 +54,6 @@ function randomBoard() {
   idx.slice(SHARDS, SHARDS + TRAPS).forEach((k) => (content[k] = 2));
   return content;
 }
-
 async function reveal(handle) {
   const z = await getZap();
   const [r] = await z.attestedReveal([handle], {
@@ -96,17 +71,13 @@ async function reveal(handle) {
     signatures: r.covalidatorSignatures.map((s) => bytesToHex(s)),
   };
 }
-
 async function pickCell(id) {
   const free = [];
   for (let pos = 0; pos < GRID; pos++) {
-    const raided = await read("isRaided", [BigInt(id), OPP_SEAT, BigInt(pos)]);
-    if (!raided) free.push(pos);
+    if (!(await read("isRaided", [BigInt(id), OPP_SEAT, BigInt(pos)]))) free.push(pos);
   }
-  if (free.length === 0) return null;
-  return free[Math.floor(Math.random() * free.length)];
+  return free.length ? free[Math.floor(Math.random() * free.length)] : null;
 }
-
 async function commitPlacement(id) {
   const board = randomBoard();
   const z = await getZap();
@@ -122,20 +93,64 @@ async function commitPlacement(id) {
   }
   const fee = await read("placementFee");
   await write("commitPlacement", [BigInt(id), cells], fee);
-  console.log(`[${id}] bot committed placement`);
 }
 
-async function playMatch(id) {
+async function main() {
+  console.log("player:", account.address);
+  const stake = parseEther("0.001");
+  const createHash = await walletClient.writeContract({
+    ...contract,
+    functionName: "createMatch",
+    args: [false],
+    value: stake,
+  });
+  const createReceipt = await publicClient.waitForTransactionReceipt({ hash: createHash });
+  let id = null;
+  for (const log of createReceipt.logs) {
+    try {
+      const ev = decodeEventLog({ abi: sealedRaidAbi, data: log.data, topics: log.topics });
+      if (ev.eventName === "MatchCreated") {
+        id = Number(ev.args.id);
+        break;
+      }
+    } catch {
+      continue;
+    }
+  }
+  console.log("created public match", id, "| waiting for bot to join...");
+
+  while (true) {
+    const m = await read("getMatch", [BigInt(id)]);
+    if (m[3] >= 1) {
+      console.log("opponent joined:", m[1]);
+      break;
+    }
+    await sleep(3000);
+  }
+
   await commitPlacement(id);
+  console.log("player committed placement | waiting for raiding phase...");
+
+  while (true) {
+    const m = await read("getMatch", [BigInt(id)]);
+    if (m[3] === 2) break;
+    if (m[3] === 3) {
+      console.log("ended early");
+      return;
+    }
+    await sleep(3000);
+  }
+  console.log("RAIDING PHASE STARTED");
+
   while (true) {
     const m = await read("getMatch", [BigInt(id)]);
     const phase = m[3];
     const turn = m[4];
     if (phase === 3) {
-      console.log(`[${id}] match ended`);
+      console.log(`MATCH ENDED | host ${m[5]} - guest ${m[6]} | winner ${m[7]}`);
       break;
     }
-    if (phase === 2 && turn === BOT_SEAT) {
+    if (phase === 2 && turn === HOST_SEAT) {
       const pos = await pickCell(id);
       if (pos === null) {
         await sleep(2000);
@@ -146,76 +161,16 @@ async function playMatch(id) {
         const handle = await read("pendingHandle", [BigInt(id)]);
         const { attestation, signatures } = await reveal(handle);
         await write("settleRaid", [BigInt(id), attestation, signatures]);
-        console.log(`[${id}] bot raided cell ${pos}`);
+        const mm = await read("getMatch", [BigInt(id)]);
+        console.log(`player raided ${pos} | scores ${mm[5]}-${mm[6]}`);
       } catch (e) {
-        console.warn(`[${id}] raid error:`, e.shortMessage || e.message);
+        console.warn("raid err:", e.shortMessage || e.message);
         await sleep(2000);
       }
     } else {
       await sleep(3000);
     }
   }
-}
-
-async function maybeJoin(id) {
-  if (active.has(id)) return;
-  const m = await read("getMatch", [BigInt(id)]);
-  const host = m[0];
-  const stake = m[2];
-  const phase = m[3];
-  const isPrivate = m[8];
-  if (phase !== 0 || isPrivate) return;
-  if (host.toLowerCase() === account.address.toLowerCase()) return;
-
-  active.add(id);
-  console.log(`[${id}] bot joining (stake ${stake})`);
-  try {
-    await write("joinMatch", [BigInt(id)], stake);
-    await playMatch(id);
-  } catch (e) {
-    console.warn(`[${id}] join/play error:`, e.shortMessage || e.message);
-  } finally {
-    active.delete(id);
-  }
-}
-
-const firstSeen = new Map();
-
-async function scan() {
-  const nextId = await read("nextMatchId");
-  const count = Number(nextId) - 1;
-  for (let id = 1; id <= count; id++) {
-    if (active.has(id)) continue;
-    const m = await read("getMatch", [BigInt(id)]);
-    const host = m[0];
-    const phase = m[3];
-    const isPrivate = m[8];
-    if (phase !== 0 || isPrivate) {
-      firstSeen.delete(id);
-      continue;
-    }
-    if (host.toLowerCase() === account.address.toLowerCase()) continue;
-    if (!firstSeen.has(id)) {
-      firstSeen.set(id, Date.now());
-      console.log(`public match ${id} seen, joining in ${JOIN_DELAY_MS}ms if still open`);
-      continue;
-    }
-    if (Date.now() - firstSeen.get(id) >= JOIN_DELAY_MS) {
-      maybeJoin(id);
-    }
-  }
-}
-
-async function main() {
-  console.log("Sealed Raid bot online");
-  console.log("bot address:", account.address);
-  console.log("contract:", CONTRACT);
-  const bal = await publicClient.getBalance({ address: account.address });
-  console.log("balance:", bal.toString(), "wei");
-
-  setInterval(() => {
-    scan().catch((e) => console.warn("scan error:", e.shortMessage || e.message));
-  }, 4000);
 }
 
 main().catch((e) => {
