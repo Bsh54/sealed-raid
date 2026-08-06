@@ -8,6 +8,7 @@ import {
   toHex,
   bytesToHex,
   decodeEventLog,
+  nonceManager,
 } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
@@ -24,7 +25,7 @@ const TRAPS = 6;
 const HOST_SEAT = 0;
 const OPP_SEAT = 1;
 
-const account = privateKeyToAccount(KEY.startsWith("0x") ? KEY : `0x${KEY}`);
+const account = privateKeyToAccount(KEY.startsWith("0x") ? KEY : `0x${KEY}`, { nonceManager });
 const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
 const walletClient = createWalletClient({ account, chain: baseSepolia, transport: http(RPC) });
 const contract = { address: CONTRACT, abi: sealedRaidAbi };

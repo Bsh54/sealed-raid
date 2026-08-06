@@ -13,6 +13,7 @@ import {
   createWalletClient,
   http,
   keccak256,
+  nonceManager,
   parseEther,
   type Abi,
   type PrivateKeyAccount,
@@ -54,7 +55,7 @@ export function BurnerProvider({ children }: { children: ReactNode }) {
     setCreating(true);
     try {
       const sig = await signMessageAsync({ message: "Sealed Raid — game session key v1" });
-      setAccount(privateKeyToAccount(keccak256(sig)));
+      setAccount(privateKeyToAccount(keccak256(sig), { nonceManager }));
     } finally {
       setCreating(false);
     }
