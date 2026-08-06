@@ -86,6 +86,12 @@ export const sealedRaidAbi = [
         "internalType": "uint256",
         "name": "stake",
         "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "isPrivate",
+        "type": "bool"
       }
     ],
     "name": "MatchCreated",
@@ -276,7 +282,13 @@ export const sealedRaidAbi = [
     "type": "function"
   },
   {
-    "inputs": [],
+    "inputs": [
+      {
+        "internalType": "bool",
+        "name": "isPrivate",
+        "type": "bool"
+      }
+    ],
     "name": "createMatch",
     "outputs": [
       {
@@ -337,6 +349,11 @@ export const sealedRaidAbi = [
         "internalType": "address",
         "name": "winner",
         "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "isPrivate",
+        "type": "bool"
       }
     ],
     "stateMutability": "view",

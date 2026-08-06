@@ -33,6 +33,7 @@ contract SealedRaid {
         uint8 hostScore;
         uint8 guestScore;
         address winner;
+        bool isPrivate;
         bool[2] committed;
     }
 
@@ -43,7 +44,7 @@ contract SealedRaid {
     mapping(uint256 => bytes32) public pendingHandle;
     mapping(uint256 => uint256) public pendingPos;
 
-    event MatchCreated(uint256 indexed id, address indexed host, uint256 stake);
+    event MatchCreated(uint256 indexed id, address indexed host, uint256 stake, bool isPrivate);
     event MatchJoined(uint256 indexed id, address indexed guest);
     event PlacementCommitted(uint256 indexed id, address indexed player, uint8 index);
     event PhaseChanged(uint256 indexed id, Phase phase);
@@ -51,14 +52,15 @@ contract SealedRaid {
     event CellRevealed(uint256 indexed id, uint8 indexed byPlayer, uint256 pos, uint256 content);
     event MatchEnded(uint256 indexed id, address indexed winner, uint256 pot);
 
-    function createMatch() external payable returns (uint256 id) {
+    function createMatch(bool isPrivate) external payable returns (uint256 id) {
         require(msg.value > 0, "stake=0");
         id = nextMatchId++;
         Match storage m = matches[id];
         m.host = msg.sender;
         m.stake = msg.value;
         m.phase = Phase.Open;
-        emit MatchCreated(id, msg.sender, msg.value);
+        m.isPrivate = isPrivate;
+        emit MatchCreated(id, msg.sender, msg.value, isPrivate);
     }
 
     function joinMatch(uint256 id) external payable {
@@ -183,11 +185,22 @@ contract SealedRaid {
             uint8 turn,
             uint8 hostScore,
             uint8 guestScore,
-            address winner
+            address winner,
+            bool isPrivate
         )
     {
         Match storage m = matches[id];
-        return (m.host, m.guest, m.stake, m.phase, m.turn, m.hostScore, m.guestScore, m.winner);
+        return (
+            m.host,
+            m.guest,
+            m.stake,
+            m.phase,
+            m.turn,
+            m.hostScore,
+            m.guestScore,
+            m.winner,
+            m.isPrivate
+        );
     }
 
     function isRaided(uint256 id, uint8 player, uint256 pos) external view returns (bool) {
