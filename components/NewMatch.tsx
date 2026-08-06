@@ -1,26 +1,62 @@
 "use client";
 
-import { useState } from "react";
-import { parseEther } from "viem";
-import { useAccount, useWriteContract } from "wagmi";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { decodeEventLog, parseEther } from "viem";
+import { baseSepolia } from "wagmi/chains";
+import {
+  useAccount,
+  useChainId,
+  useSwitchChain,
+  useWaitForTransactionReceipt,
+  useWriteContract,
+} from "wagmi";
 import { sealedRaidContract, isContractConfigured } from "@/lib/contract";
 
 const STAKES = [0.001, 0.005, 0.01];
 
 export function NewMatch() {
+  const router = useRouter();
   const [stake, setStake] = useState(STAKES[1]);
+
   const { isConnected } = useAccount();
-  const { writeContract, isPending } = useWriteContract();
+  const chainId = useChainId();
+  const { switchChain } = useSwitchChain();
+  const { writeContract, data: hash, isPending } = useWriteContract();
+  const { data: receipt, isLoading: isMining } = useWaitForTransactionReceipt({ hash });
+
+  const wrongNetwork = isConnected && chainId !== baseSepolia.id;
+
+  useEffect(() => {
+    if (!receipt) return;
+    for (const log of receipt.logs) {
+      try {
+        const event = decodeEventLog({
+          abi: sealedRaidContract.abi,
+          data: log.data,
+          topics: log.topics,
+        });
+        if (event.eventName === "MatchCreated") {
+          const id = (event.args as { id: bigint }).id;
+          router.push(`/placement?id=${id.toString()}`);
+          return;
+        }
+      } catch {
+        continue;
+      }
+    }
+  }, [receipt, router]);
 
   function createMatch() {
     writeContract({
       ...sealedRaidContract,
       functionName: "createMatch",
       value: parseEther(String(stake)),
+      chainId: baseSepolia.id,
     });
   }
 
-  const disabled = !isConnected || !isContractConfigured || isPending;
+  const busy = isPending || isMining;
 
   return (
     <div className="panel p-5">
@@ -32,24 +68,33 @@ export function NewMatch() {
             key={v}
             onClick={() => setStake(v)}
             className={`data border py-2 text-sm ${
-              stake === v
-                ? "border-shard text-shard"
-                : "border-line text-fg-dim hover:text-fg"
+              stake === v ? "border-shard text-shard" : "border-line text-fg-dim hover:text-fg"
             }`}
           >
             {v}
           </button>
         ))}
       </div>
-      <button
-        onClick={createMatch}
-        disabled={disabled}
-        className="term-btn w-full disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {isPending ? "Confirming..." : "Create Match"}
-      </button>
-      {!isContractConfigured && (
-        <p className="label-caps mt-3 text-xs text-fg-dim">Contract not yet deployed</p>
+
+      {wrongNetwork ? (
+        <button
+          onClick={() => switchChain({ chainId: baseSepolia.id })}
+          className="term-btn w-full"
+        >
+          Switch to Base Sepolia
+        </button>
+      ) : (
+        <button
+          onClick={createMatch}
+          disabled={!isConnected || !isContractConfigured || busy}
+          className="term-btn w-full disabled:cursor-not-allowed disabled:opacity-40"
+        >
+          {isPending ? "Confirm in wallet..." : isMining ? "Creating..." : "Create Match"}
+        </button>
+      )}
+
+      {!isConnected && (
+        <p className="label-caps mt-3 text-xs text-fg-dim">Connect wallet to create</p>
       )}
     </div>
   );
