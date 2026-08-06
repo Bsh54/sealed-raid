@@ -57,19 +57,18 @@ contract SealedRaid {
         emit MatchCreated(id, msg.sender, msg.value, isPrivate);
     }
 
-    function joinFee() external view returns (uint256) {
-        return inco.getEListFee(uint16(GRID), ETypes.Bool);
-    }
+    uint256 public constant JOIN_BUFFER = 0.008 ether;
 
     function joinMatch(uint256 id) external payable {
         Match storage m = matches[id];
         require(m.phase == Phase.Open, "not open");
         require(m.host != address(0), "no match");
         require(msg.sender != m.host, "self");
-        uint256 fee = inco.getEListFee(uint16(GRID), ETypes.Bool);
-        require(msg.value >= m.stake + fee, "value");
+        require(msg.value >= m.stake + JOIN_BUFFER, "value");
 
         m.guest = msg.sender;
+
+        uint256 balBefore = address(this).balance;
 
         bytes32 trueHandle = ebool.unwrap(e.asEbool(true));
         bytes32 falseHandle = ebool.unwrap(e.asEbool(false));
@@ -86,9 +85,10 @@ contract SealedRaid {
         emit MatchJoined(id, msg.sender);
         emit PhaseChanged(id, Phase.Raiding);
 
-        uint256 excess = msg.value - m.stake - fee;
-        if (excess > 0) {
-            (bool ok, ) = msg.sender.call{value: excess}("");
+        uint256 spent = balBefore - address(this).balance;
+        uint256 refund = msg.value - m.stake - spent;
+        if (refund > 0) {
+            (bool ok, ) = msg.sender.call{value: refund}("");
             require(ok, "refund");
         }
     }
