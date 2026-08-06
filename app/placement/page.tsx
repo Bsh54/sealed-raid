@@ -132,14 +132,14 @@ function Placement() {
         : "Encrypt & Commit";
 
   return (
-    <div className="mx-auto w-full max-w-6xl px-4 py-6 lg:px-8">
-      <header className="mb-6">
-        <h1 className="text-3xl font-extrabold tracking-tight text-shard">
+    <div className="mx-auto flex min-h-dvh w-full max-w-6xl flex-col justify-center px-4 py-6 lg:px-8">
+      <header className="mb-5">
+        <h1 className="text-2xl font-extrabold tracking-tight text-shard">
           PHASE 1 // DEPLOYMENT
         </h1>
       </header>
 
-      <div className="grid gap-8 lg:grid-cols-[280px_1fr]">
+      <div className="grid items-center gap-8 lg:grid-cols-[240px_1fr]">
         <div className="flex flex-col gap-4">
           <button
             onClick={() => setTool("shard")}
@@ -178,8 +178,11 @@ function Placement() {
           {!matchId && <p className="label-caps text-xs text-ice">No match id in URL</p>}
         </div>
 
-        <div className="panel p-4 sm:p-6">
-          <div className="mb-2 grid grid-cols-[24px_repeat(6,1fr)] gap-2">
+        <div
+          className="panel w-full p-3 sm:p-4"
+          style={{ maxWidth: "min(90vw, 56vh)" }}
+        >
+          <div className="mb-1.5 grid grid-cols-[18px_repeat(6,1fr)] gap-1.5">
             <span />
             {Array.from({ length: COLS }).map((_, c) => (
               <span key={c} className="label-caps text-center text-fg-dim">
@@ -187,7 +190,7 @@ function Placement() {
               </span>
             ))}
           </div>
-          <div className="grid grid-cols-[24px_repeat(6,1fr)] gap-2">
+          <div className="grid grid-cols-[18px_repeat(6,1fr)] gap-1.5">
             {Array.from({ length: GRID }).map((_, i) => {
               const isRowStart = i % COLS === 0;
               return (
