@@ -104,11 +104,15 @@ function Raid() {
       if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
         setStep("raiding");
         await burner.writeGame("raid", [matchId, BigInt(pos)]);
-        handle = (await client.readContract({
-          ...sealedRaidContract,
-          functionName: "pendingHandle",
-          args: [matchId],
-        })) as HexString;
+        for (let i = 0; i < 20; i++) {
+          handle = (await client.readContract({
+            ...sealedRaidContract,
+            functionName: "pendingHandle",
+            args: [matchId],
+          })) as HexString;
+          if (handle && handle.toLowerCase() !== ZERO_HANDLE) break;
+          await new Promise((r) => setTimeout(r, 1500));
+        }
       }
       if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
         throw new Error("No pending handle after raid");
