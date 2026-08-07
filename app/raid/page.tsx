@@ -8,6 +8,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { sealedRaidContract } from "@/lib/contract";
 import { useBurner } from "@/lib/burner";
 import { revealHandle } from "@/lib/inco-attestation";
+import { Spinner } from "@/components/Spinner";
 
 const GRID = 36;
 const ZERO_HANDLE = "0x" + "0".repeat(64);
@@ -90,40 +91,50 @@ function Raid() {
     if (phase === 2 && matchId !== null) router.push(`/victory?id=${matchId.toString()}`);
   }, [phase, matchId, router]);
 
+  async function readPending() {
+    if (!client || matchId === null) return ZERO_HANDLE as HexString;
+    return (await client.readContract({
+      ...sealedRaidContract,
+      functionName: "pendingHandle",
+      args: [matchId],
+    })) as HexString;
+  }
+
+  async function revealAndSettle(handle: HexString) {
+    if (matchId === null) return;
+    setStep("revealing");
+    const { attestation, signatures } = await revealHandle(handle);
+    setStep("settling");
+    await burner.writeGame("settleRaid", [matchId, attestation, signatures]);
+    await refresh();
+  }
+
   async function raidCell(pos: number) {
     if (!client || matchId === null || !isMyTurn || !burner.ready) return;
+    if (pos in opened) return;
     setError(null);
     setPending((p) => ({ ...p, [pos]: true }));
     try {
-      let handle = (await client.readContract({
-        ...sealedRaidContract,
-        functionName: "pendingHandle",
-        args: [matchId],
-      })) as HexString;
+      const existing = await readPending();
+      if (existing && existing.toLowerCase() !== ZERO_HANDLE) {
+        await revealAndSettle(existing);
+        return;
+      }
 
-      if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
-        setStep("raiding");
-        await burner.writeGame("raid", [matchId, BigInt(pos)]);
-        for (let i = 0; i < 20; i++) {
-          handle = (await client.readContract({
-            ...sealedRaidContract,
-            functionName: "pendingHandle",
-            args: [matchId],
-          })) as HexString;
-          if (handle && handle.toLowerCase() !== ZERO_HANDLE) break;
-          await new Promise((r) => setTimeout(r, 1500));
-        }
+      setStep("raiding");
+      await burner.writeGame("raid", [matchId, BigInt(pos)]);
+
+      let handle = ZERO_HANDLE as HexString;
+      for (let i = 0; i < 20; i++) {
+        handle = await readPending();
+        if (handle && handle.toLowerCase() !== ZERO_HANDLE) break;
+        await new Promise((r) => setTimeout(r, 1500));
       }
       if (!handle || handle.toLowerCase() === ZERO_HANDLE) {
         throw new Error("No pending handle after raid");
       }
 
-      setStep("revealing");
-      const { attestation, signatures } = await revealHandle(handle);
-
-      setStep("settling");
-      await burner.writeGame("settleRaid", [matchId, attestation, signatures]);
-      await refresh();
+      await revealAndSettle(handle);
     } catch (e) {
       setError(e instanceof Error ? e.message.split("\n")[0] : "Raid failed");
     } finally {
@@ -152,6 +163,15 @@ function Raid() {
             ? "Your turn // raid a cell"
             : "Opponent's turn...";
 
+  if (!burner.ready) {
+    return (
+      <div className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col items-center justify-center px-4">
+        <Spinner size={48} />
+        <div className="label-caps mt-6 text-fg-dim">Restoring game session...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-8">
       <header className="mb-6 flex items-center justify-between">
@@ -166,10 +186,10 @@ function Raid() {
       </header>
 
       {waiting ? (
-        <div className="panel p-10 text-center">
-          <div className="mx-auto mb-5 h-8 w-8 animate-spin border-2 border-shard border-t-transparent" />
-          <div className="label-caps text-shard">Waiting for opponent to join</div>
-          <div className="mt-5">
+        <div className="panel flex flex-col items-center p-12 text-center">
+          <Spinner size={56} />
+          <div className="label-caps mt-6 text-shard">Searching for opponent</div>
+          <div className="mt-6">
             <div className="label-caps text-fg-dim">Share this match id</div>
             <div className="data mt-1 text-3xl text-fg">#{matchId?.toString() ?? "-"}</div>
           </div>

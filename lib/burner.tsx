@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -24,7 +25,7 @@ import { useSendTransaction, useSignMessage } from "wagmi";
 import { sealedRaidContract } from "@/lib/contract";
 
 const RPC = "https://sepolia.base.org";
-const TOPUP = parseEther("0.03");
+const STORAGE_KEY = "sealed-raid-burner-pk";
 const publicClient = createPublicClient({ chain: baseSepolia, transport: http(RPC) });
 
 type WriteArgs = readonly unknown[];
@@ -51,11 +52,24 @@ export function BurnerProvider({ children }: { children: ReactNode }) {
   const { signMessageAsync } = useSignMessage();
   const { sendTransactionAsync } = useSendTransaction();
 
+  useEffect(() => {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try {
+        setAccount(privateKeyToAccount(stored as `0x${string}`, { nonceManager }));
+      } catch {
+        localStorage.removeItem(STORAGE_KEY);
+      }
+    }
+  }, []);
+
   const create = useCallback(async () => {
     setCreating(true);
     try {
       const sig = await signMessageAsync({ message: "Sealed Raid — game session key v1" });
-      setAccount(privateKeyToAccount(keccak256(sig), { nonceManager }));
+      const pk = keccak256(sig);
+      localStorage.setItem(STORAGE_KEY, pk);
+      setAccount(privateKeyToAccount(pk, { nonceManager }));
     } finally {
       setCreating(false);
     }
@@ -79,7 +93,8 @@ export function BurnerProvider({ children }: { children: ReactNode }) {
       if (!account) throw new Error("Burner not ready");
       const bal = await publicClient.getBalance({ address: account.address });
       if (bal >= min) return;
-      const hash = await sendTransactionAsync({ to: account.address, value: TOPUP });
+      const topUp = min - bal + parseEther("0.005");
+      const hash = await sendTransactionAsync({ to: account.address, value: topUp });
       await publicClient.waitForTransactionReceipt({ hash });
     },
     [account, sendTransactionAsync],
